@@ -1,0 +1,2947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Appetina IMS — Catering Inventory Intelligence</title>
+<meta name="description" content="Enterprise-grade catering inventory management with AI, barcode scanning, RFID, and real-time sync">
+<meta name="theme-color" content="#0a0f1e">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-void: #060912;
+    --bg-deep: #0a0f1e;
+    --bg-surface: #111827;
+    --bg-card: #151d2e;
+    --bg-elevated: #1a2438;
+    --bg-hover: #1f2c42;
+    --border: rgba(99,130,190,0.12);
+    --border-bright: rgba(99,130,190,0.28);
+    --accent-primary: #3b82f6;
+    --accent-glow: #60a5fa;
+    --accent-cyan: #06b6d4;
+    --accent-emerald: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    --accent-violet: #8b5cf6;
+    --text-primary: #f1f5ff;
+    --text-secondary: #94a3c8;
+    --text-muted: #4a5578;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+    --font-body: 'Instrument Sans', sans-serif;
+    --radius: 12px;
+    --radius-lg: 18px;
+    --shadow-card: 0 4px 24px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
+    --shadow-glow: 0 0 40px rgba(59,130,246,0.15);
+    --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg-void);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  #root { min-height: 100vh; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg-deep); }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+  /* ── Loading Screen ── */
+  #boot {
+    position: fixed; inset: 0; z-index: 9999;
+    background: var(--bg-void);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 24px;
+  }
+  .boot-logo {
+    font-family: var(--font-display);
+    font-size: 2.5rem; font-weight: 800;
+    background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 50%, #10b981 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    animation: bootPulse 1.5s ease-in-out infinite;
+  }
+  .boot-bar {
+    width: 240px; height: 2px;
+    background: var(--bg-elevated);
+    border-radius: 1px; overflow: hidden;
+  }
+  .boot-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #3b82f6, #06b6d4);
+    border-radius: 1px;
+    animation: bootLoad 2s ease-in-out forwards;
+  }
+  @keyframes bootLoad { to { width: 100%; } }
+  @keyframes bootPulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+  .boot-text {
+    font-family: var(--font-mono); font-size: 0.7rem;
+    color: var(--text-muted); letter-spacing: 0.15em;
+    animation: bootText 2s steps(1) infinite;
+  }
+  @keyframes bootText {
+    0%{content:'INITIALIZING SYSTEM...'} 33%{content:'LOADING MODULES...'} 66%{content:'CONNECTING APIS...'}
+  }
+
+  /* ── App Shell ── */
+  .app-shell {
+    display: flex; min-height: 100vh;
+    opacity: 0; animation: fadeIn 0.5s ease 0.3s forwards;
+  }
+  @keyframes fadeIn { to { opacity: 1; } }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 260px; flex-shrink: 0;
+    background: var(--bg-deep);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 100;
+    transition: transform var(--transition);
+  }
+  .sidebar.collapsed { transform: translateX(-260px); }
+  .sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .sidebar-logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    box-shadow: 0 0 20px rgba(59,130,246,0.3);
+  }
+  .sidebar-brand {
+    font-family: var(--font-display);
+    font-weight: 800; font-size: 1.1rem;
+    color: var(--text-primary);
+  }
+  .sidebar-brand span { color: var(--accent-cyan); }
+  .sidebar-nav { flex: 1; padding: 12px 8px; overflow-y: auto; }
+  .nav-section {
+    margin-bottom: 24px;
+  }
+  .nav-section-label {
+    font-family: var(--font-mono);
+    font-size: 0.62rem; font-weight: 500;
+    color: var(--text-muted); letter-spacing: 0.12em;
+    padding: 0 12px; margin-bottom: 6px; text-transform: uppercase;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 9px;
+    cursor: pointer; transition: all var(--transition);
+    font-size: 0.875rem; font-weight: 500;
+    color: var(--text-secondary);
+    position: relative; user-select: none;
+  }
+  .nav-item:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .nav-item.active {
+    background: rgba(59,130,246,0.15);
+    color: var(--accent-glow);
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute; left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 3px; height: 60%;
+    background: var(--accent-primary);
+    border-radius: 0 2px 2px 0;
+  }
+  .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+  .nav-badge {
+    margin-left: auto;
+    background: var(--accent-rose);
+    color: white; font-size: 0.65rem; font-weight: 700;
+    padding: 1px 6px; border-radius: 99px;
+    font-family: var(--font-mono);
+  }
+  .nav-badge.amber { background: var(--accent-amber); color: var(--bg-void); }
+  .nav-badge.emerald { background: var(--accent-emerald); }
+  .sidebar-footer {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .user-chip {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px; border-radius: var(--radius);
+    background: var(--bg-surface);
+    cursor: pointer; transition: background var(--transition);
+  }
+  .user-chip:hover { background: var(--bg-elevated); }
+  .user-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 700; color: white;
+    flex-shrink: 0;
+  }
+  .user-info { flex: 1; min-width: 0; }
+  .user-name {
+    font-size: 0.8rem; font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .user-role {
+    font-family: var(--font-mono); font-size: 0.62rem;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .ws-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent-emerald);
+    box-shadow: 0 0 6px var(--accent-emerald);
+    animation: wsPulse 2s infinite;
+  }
+  @keyframes wsPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── Main Content ── */
+  .main-content {
+    flex: 1; margin-left: 260px;
+    display: flex; flex-direction: column;
+    min-height: 100vh;
+    transition: margin-left var(--transition);
+  }
+  .main-content.expanded { margin-left: 0; }
+
+  /* ── Top Bar ── */
+  .topbar {
+    height: 60px; flex-shrink: 0;
+    background: rgba(10,15,30,0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 24px; gap: 16px;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar-toggle {
+    width: 32px; height: 32px;
+    border: 1px solid var(--border);
+    border-radius: 8px; background: none;
+    color: var(--text-secondary); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; transition: all var(--transition);
+  }
+  .topbar-toggle:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .topbar-title {
+    font-family: var(--font-display);
+    font-weight: 700; font-size: 1.1rem;
+  }
+  .topbar-search {
+    flex: 1; max-width: 360px;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 9px; padding: 0 12px; height: 36px;
+    transition: border-color var(--transition);
+  }
+  .topbar-search:focus-within { border-color: var(--accent-primary); }
+  .topbar-search input {
+    flex: 1; background: none; border: none; outline: none;
+    color: var(--text-primary); font-size: 0.85rem;
+    font-family: var(--font-body);
+  }
+  .topbar-search input::placeholder { color: var(--text-muted); }
+  .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .icon-btn {
+    width: 36px; height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 9px; background: none;
+    color: var(--text-secondary); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; transition: all var(--transition);
+    position: relative;
+  }
+  .icon-btn:hover { background: var(--bg-elevated); color: var(--text-primary); border-color: var(--border-bright); }
+  .icon-btn .badge {
+    position: absolute; top: -4px; right: -4px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent-rose); color: white;
+    font-size: 0.6rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid var(--bg-void);
+    font-family: var(--font-mono);
+  }
+
+  /* ── Page Content ── */
+  .page-content {
+    flex: 1; padding: 24px;
+    max-width: 1600px; width: 100%;
+    margin: 0 auto;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    transition: border-color var(--transition), transform var(--transition);
+  }
+  .card:hover { border-color: var(--border-bright); }
+  .card-header {
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .card-title {
+    font-family: var(--font-display);
+    font-weight: 700; font-size: 0.95rem;
+    color: var(--text-primary);
+  }
+  .card-body { padding: 20px; }
+
+  /* ── Stat Cards ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px; margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    position: relative; overflow: hidden;
+    transition: all var(--transition);
+    cursor: default;
+  }
+  .stat-card:hover {
+    border-color: var(--border-bright);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow);
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute; top: 0; right: 0;
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    filter: blur(24px); opacity: 0.15;
+  }
+  .stat-card.blue::before { background: #3b82f6; }
+  .stat-card.cyan::before { background: #06b6d4; }
+  .stat-card.emerald::before { background: #10b981; }
+  .stat-card.amber::before { background: #f59e0b; }
+  .stat-card.rose::before { background: #f43f5e; }
+  .stat-card.violet::before { background: #8b5cf6; }
+  .stat-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; margin-bottom: 14px;
+  }
+  .stat-card.blue .stat-icon { background: rgba(59,130,246,0.15); color: #3b82f6; }
+  .stat-card.cyan .stat-icon { background: rgba(6,182,212,0.15); color: #06b6d4; }
+  .stat-card.emerald .stat-icon { background: rgba(16,185,129,0.15); color: #10b981; }
+  .stat-card.amber .stat-icon { background: rgba(245,158,11,0.15); color: #f59e0b; }
+  .stat-card.rose .stat-icon { background: rgba(244,63,94,0.15); color: #f43f5e; }
+  .stat-card.violet .stat-icon { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+  .stat-value {
+    font-family: var(--font-display);
+    font-size: 2rem; font-weight: 800;
+    color: var(--text-primary); line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-label {
+    font-size: 0.78rem; color: var(--text-muted);
+    font-weight: 500; margin-bottom: 10px;
+  }
+  .stat-change {
+    font-family: var(--font-mono); font-size: 0.7rem;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .stat-change.up { color: var(--accent-emerald); }
+  .stat-change.down { color: var(--accent-rose); }
+  .stat-change.warn { color: var(--accent-amber); }
+
+  /* ── Tables ── */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    padding: 10px 14px;
+    font-family: var(--font-mono); font-size: 0.68rem;
+    font-weight: 500; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .data-table td {
+    padding: 12px 14px;
+    font-size: 0.83rem; color: var(--text-secondary);
+    border-bottom: 1px solid rgba(99,130,190,0.06);
+    vertical-align: middle;
+  }
+  .data-table tr:hover td { background: var(--bg-elevated); color: var(--text-primary); }
+  .data-table tr:last-child td { border-bottom: none; }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 99px;
+    font-family: var(--font-mono); font-size: 0.65rem;
+    font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .badge.success { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.2); }
+  .badge.warning { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2); }
+  .badge.danger { background: rgba(244,63,94,0.12); color: #f43f5e; border: 1px solid rgba(244,63,94,0.2); }
+  .badge.info { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.2); }
+  .badge.muted { background: rgba(99,130,190,0.08); color: var(--text-muted); border: 1px solid var(--border); }
+  .badge.cyan { background: rgba(6,182,212,0.12); color: #06b6d4; border: 1px solid rgba(6,182,212,0.2); }
+  .badge.violet { background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.2); }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px; border-radius: 9px;
+    font-family: var(--font-body); font-size: 0.85rem; font-weight: 600;
+    cursor: pointer; transition: all var(--transition);
+    border: none; outline: none; user-select: none;
+  }
+  .btn-primary {
+    background: var(--accent-primary);
+    color: white;
+    box-shadow: 0 0 20px rgba(59,130,246,0.25);
+  }
+  .btn-primary:hover {
+    background: var(--accent-glow);
+    box-shadow: 0 0 30px rgba(59,130,246,0.4);
+    transform: translateY(-1px);
+  }
+  .btn-secondary {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .btn-secondary:hover { border-color: var(--border-bright); color: var(--text-primary); }
+  .btn-danger { background: rgba(244,63,94,0.15); border: 1px solid rgba(244,63,94,0.3); color: #f43f5e; }
+  .btn-danger:hover { background: var(--accent-rose); color: white; }
+  .btn-sm { padding: 6px 12px; font-size: 0.78rem; border-radius: 7px; }
+  .btn-icon { padding: 8px; border-radius: 8px; }
+
+  /* ── Progress Bars ── */
+  .progress-bar {
+    height: 6px; background: var(--bg-elevated);
+    border-radius: 3px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+  .progress-fill.blue { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+  .progress-fill.emerald { background: linear-gradient(90deg, #10b981, #34d399); }
+  .progress-fill.amber { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+  .progress-fill.rose { background: linear-gradient(90deg, #f43f5e, #fb7185); }
+
+  /* ── Alerts ── */
+  .alert {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 14px 16px; border-radius: var(--radius);
+    border: 1px solid;
+    font-size: 0.83rem;
+  }
+  .alert.warning { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); color: #fbbf24; }
+  .alert.danger { background: rgba(244,63,94,0.08); border-color: rgba(244,63,94,0.25); color: #fb7185; }
+  .alert.info { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.25); color: #93bbfd; }
+  .alert.success { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.25); color: #6ee7b7; }
+
+  /* ── Forms ── */
+  .form-group { margin-bottom: 16px; }
+  .form-label {
+    display: block; margin-bottom: 6px;
+    font-size: 0.78rem; font-weight: 600;
+    color: var(--text-secondary); text-transform: uppercase;
+    letter-spacing: 0.06em; font-family: var(--font-mono);
+  }
+  .form-control {
+    width: 100%; padding: 10px 14px;
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: 9px; color: var(--text-primary);
+    font-size: 0.88rem; font-family: var(--font-body);
+    outline: none; transition: border-color var(--transition);
+  }
+  .form-control:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+  .form-control::placeholder { color: var(--text-muted); }
+  select.form-control { cursor: pointer; }
+  textarea.form-control { resize: vertical; min-height: 80px; }
+
+  /* ── Grid Layouts ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  .grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .content-grid { display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    animation: modalIn 0.2s ease;
+  }
+  @keyframes modalIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
+  .modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 20px;
+    width: 100%; max-width: 560px;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  }
+  .modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .modal-title {
+    font-family: var(--font-display); font-weight: 700; font-size: 1.05rem;
+    flex: 1;
+  }
+  .modal-close {
+    width: 28px; height: 28px; border-radius: 7px;
+    border: 1px solid var(--border); background: none;
+    color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all var(--transition); font-size: 0.9rem;
+  }
+  .modal-close:hover { background: var(--accent-rose); border-color: var(--accent-rose); color: white; }
+  .modal-body { padding: 24px; }
+  .modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 10px; justify-content: flex-end;
+  }
+
+  /* ── Scanner View ── */
+  .scanner-container {
+    position: relative; background: #000;
+    border-radius: var(--radius-lg); overflow: hidden;
+    aspect-ratio: 4/3;
+  }
+  .scanner-video { width: 100%; height: 100%; object-fit: cover; }
+  .scanner-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scanner-frame {
+    width: 240px; height: 160px;
+    border: 2px solid var(--accent-cyan);
+    border-radius: 12px;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.5),
+                inset 0 0 20px rgba(6,182,212,0.1);
+    position: relative;
+  }
+  .scanner-frame::before, .scanner-frame::after {
+    content: ''; position: absolute;
+    width: 20px; height: 20px;
+    border-color: var(--accent-cyan); border-style: solid;
+  }
+  .scanner-frame::before { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-radius: 8px 0 0 0; }
+  .scanner-frame::after { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-radius: 0 0 8px 0; }
+  .scanner-line {
+    position: absolute; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+    animation: scan 2s linear infinite;
+  }
+  @keyframes scan { 0%{top:0} 100%{top:100%} }
+
+  /* ── Chart Bars ── */
+  .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+  .bar {
+    flex: 1; border-radius: 4px 4px 0 0;
+    transition: height 0.6s ease;
+    position: relative; cursor: pointer;
+  }
+  .bar:hover::after {
+    content: attr(data-value);
+    position: absolute; top: -22px; left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono); font-size: 0.62rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  /* ── AI Chat ── */
+  .ai-chat {
+    display: flex; flex-direction: column; height: 460px;
+  }
+  .ai-messages {
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .ai-msg {
+    max-width: 80%; padding: 10px 14px; border-radius: 12px;
+    font-size: 0.84rem; line-height: 1.5;
+  }
+  .ai-msg.user {
+    align-self: flex-end;
+    background: rgba(59,130,246,0.2); border: 1px solid rgba(59,130,246,0.3);
+    color: var(--text-primary);
+  }
+  .ai-msg.assistant {
+    align-self: flex-start;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .ai-msg.assistant.loading {
+    display: flex; gap: 4px; align-items: center; padding: 14px;
+  }
+  .ai-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent-primary);
+    animation: aiDot 1.2s infinite;
+  }
+  .ai-dot:nth-child(2) { animation-delay: 0.2s; }
+  .ai-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes aiDot { 0%,80%,100%{opacity:0.3;transform:scale(0.8)} 40%{opacity:1;transform:scale(1)} }
+  .ai-input-row {
+    display: flex; gap: 8px; padding: 12px 16px;
+    border-top: 1px solid var(--border);
+  }
+  .ai-input {
+    flex: 1; background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: 9px; padding: 9px 14px;
+    color: var(--text-primary); font-size: 0.85rem; font-family: var(--font-body);
+    outline: none; transition: border-color var(--transition);
+  }
+  .ai-input:focus { border-color: var(--accent-primary); }
+
+  /* ── Notifications Panel ── */
+  .notif-panel {
+    position: fixed; right: 16px; top: 72px; z-index: 150;
+    width: 340px;
+    background: var(--bg-card); border: 1px solid var(--border-bright);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    animation: slideDown 0.25s ease;
+  }
+  @keyframes slideDown { from{opacity:0;transform:translateY(-12px)} to{opacity:1;transform:translateY(0)} }
+  .notif-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    transition: background var(--transition); cursor: pointer;
+  }
+  .notif-item:hover { background: var(--bg-elevated); }
+  .notif-item:last-child { border-bottom: none; }
+  .notif-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    margin-top: 4px; flex-shrink: 0;
+  }
+  .notif-dot.rose { background: var(--accent-rose); box-shadow: 0 0 6px var(--accent-rose); }
+  .notif-dot.amber { background: var(--accent-amber); box-shadow: 0 0 6px var(--accent-amber); }
+  .notif-dot.cyan { background: var(--accent-cyan); box-shadow: 0 0 6px var(--accent-cyan); }
+  .notif-dot.emerald { background: var(--accent-emerald); box-shadow: 0 0 6px var(--accent-emerald); }
+  .notif-text { flex: 1; }
+  .notif-title { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+  .notif-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; }
+  .notif-time { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-muted); }
+
+  /* ── Live Feed ── */
+  .live-feed { display: flex; flex-direction: column; gap: 1px; }
+  .feed-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 8px;
+    transition: background var(--transition);
+    font-size: 0.8rem;
+  }
+  .feed-item:hover { background: var(--bg-elevated); }
+  .feed-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .feed-text { flex: 1; color: var(--text-secondary); }
+  .feed-text strong { color: var(--text-primary); }
+  .feed-time { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-muted); }
+
+  /* ── RFID Dashboard ── */
+  .rfid-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;
+  }
+  .rfid-tag {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px;
+    transition: all var(--transition); cursor: pointer;
+    position: relative; overflow: hidden;
+  }
+  .rfid-tag:hover { border-color: var(--border-bright); transform: translateY(-1px); }
+  .rfid-tag.active { border-color: rgba(16,185,129,0.4); }
+  .rfid-tag.missing { border-color: rgba(244,63,94,0.4); }
+  .rfid-tag.inactive { opacity: 0.6; }
+  .rfid-tag-id {
+    font-family: var(--font-mono); font-size: 0.65rem;
+    color: var(--text-muted); margin-bottom: 6px;
+  }
+  .rfid-tag-name { font-weight: 600; font-size: 0.85rem; margin-bottom: 8px; }
+  .rfid-tag-loc { font-size: 0.75rem; color: var(--text-muted); }
+  .rfid-pulse {
+    position: absolute; top: 10px; right: 10px;
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .rfid-pulse.active {
+    background: var(--accent-emerald);
+    animation: rfidPulse 1.5s infinite;
+    box-shadow: 0 0 6px var(--accent-emerald);
+  }
+  .rfid-pulse.missing { background: var(--accent-rose); box-shadow: 0 0 6px var(--accent-rose); }
+  .rfid-pulse.inactive { background: var(--text-muted); }
+  @keyframes rfidPulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:0.7} }
+
+  /* ── Event Timeline ── */
+  .timeline { position: relative; padding-left: 24px; }
+  .timeline::before {
+    content: ''; position: absolute; left: 8px; top: 0; bottom: 0;
+    width: 1px; background: var(--border);
+  }
+  .timeline-item { position: relative; margin-bottom: 20px; }
+  .timeline-dot {
+    position: absolute; left: -20px; top: 4px;
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 2px solid var(--bg-card);
+  }
+  .timeline-dot.blue { background: var(--accent-primary); }
+  .timeline-dot.emerald { background: var(--accent-emerald); }
+  .timeline-dot.amber { background: var(--accent-amber); }
+  .timeline-dot.rose { background: var(--accent-rose); }
+  .timeline-content {
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px;
+  }
+  .timeline-title { font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+  .timeline-desc { font-size: 0.78rem; color: var(--text-muted); }
+
+  /* ── Tabs ── */
+  .tab-list {
+    display: flex; gap: 2px; padding: 4px;
+    background: var(--bg-surface); border-radius: 10px;
+    width: fit-content; margin-bottom: 20px;
+  }
+  .tab {
+    padding: 8px 16px; border-radius: 7px;
+    font-size: 0.83rem; font-weight: 600;
+    cursor: pointer; transition: all var(--transition);
+    color: var(--text-muted); border: none; background: none;
+    font-family: var(--font-body);
+  }
+  .tab:hover { color: var(--text-primary); }
+  .tab.active {
+    background: var(--bg-card); color: var(--text-primary);
+    box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+  }
+
+  /* ── Stock Level Indicator ── */
+  .stock-level {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .stock-bars { display: flex; gap: 2px; align-items: flex-end; }
+  .stock-bar { width: 4px; border-radius: 2px; }
+
+  /* ── Mobile Menu Toggle ── */
+  .mobile-overlay {
+    display: none; position: fixed; inset: 0; z-index: 90;
+    background: rgba(0,0,0,0.6);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 1024px) {
+    .content-grid { grid-template-columns: 1fr; }
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-260px); }
+    .sidebar.open { transform: translateX(0); }
+    .main-content { margin-left: 0; }
+    .mobile-overlay.show { display: block; }
+    .page-content { padding: 16px; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .topbar-search { display: none; }
+  }
+  @media (max-width: 480px) {
+    .stat-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Utility ── */
+  .flex { display: flex; }
+  .flex-col { flex-direction: column; }
+  .items-center { align-items: center; }
+  .justify-between { justify-content: space-between; }
+  .gap-2 { gap: 8px; }
+  .gap-3 { gap: 12px; }
+  .gap-4 { gap: 16px; }
+  .mb-1 { margin-bottom: 4px; }
+  .mb-2 { margin-bottom: 8px; }
+  .mb-3 { margin-bottom: 12px; }
+  .mb-4 { margin-bottom: 16px; }
+  .mb-6 { margin-bottom: 24px; }
+  .text-sm { font-size: 0.83rem; }
+  .text-xs { font-size: 0.72rem; }
+  .text-muted { color: var(--text-muted); }
+  .text-secondary { color: var(--text-secondary); }
+  .font-mono { font-family: var(--font-mono); }
+  .font-display { font-family: var(--font-display); }
+  .w-full { width: 100%; }
+  .overflow-hidden { overflow: hidden; }
+  .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+</style>
+</head>
+<body>
+
+<!-- Boot Screen -->
+<div id="boot">
+  <div class="boot-logo">🍽 Appetina IMS</div>
+  <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-muted);letter-spacing:0.15em">CATERING INVENTORY INTELLIGENCE</div>
+  <div class="boot-bar"><div class="boot-fill"></div></div>
+  <div class="boot-text">INITIALIZING SYSTEM...</div>
+</div>
+
+<!-- Notification Panel (hidden by default) -->
+<div id="notifPanel" class="notif-panel" style="display:none">
+  <div class="card-header" style="border-bottom:1px solid var(--border)">
+    <span style="font-size:1rem">🔔</span>
+    <span class="card-title">Notifications</span>
+    <span class="badge danger" style="margin-left:auto">5</span>
+  </div>
+  <div id="notifList"></div>
+  <div style="padding:12px 16px;border-top:1px solid var(--border);text-align:center">
+    <button class="btn btn-secondary btn-sm w-full">Mark All as Read</button>
+  </div>
+</div>
+
+<!-- Mobile Overlay -->
+<div class="mobile-overlay" id="mobileOverlay" onclick="toggleSidebar()"></div>
+
+<!-- Main App Shell -->
+<div class="app-shell" id="appShell">
+
+  <!-- Sidebar Navigation -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">🍽</div>
+      <div>
+        <div class="sidebar-brand">Appetina <span>IMS</span></div>
+        <div style="font-family:var(--font-mono);font-size:0.58rem;color:var(--text-muted);letter-spacing:0.08em">INVENTORY INTELLIGENCE</div>
+      </div>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-section-label">Overview</div>
+        <div class="nav-item active" onclick="navigate('dashboard')">
+          <span class="nav-icon">⬛</span> Dashboard
+        </div>
+        <div class="nav-item" onclick="navigate('notifications')">
+          <span class="nav-icon">🔔</span> Alerts
+          <span class="nav-badge">5</span>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-label">Inventory</div>
+        <div class="nav-item" onclick="navigate('inventory')">
+          <span class="nav-icon">📦</span> Stock Items
+          <span class="nav-badge amber">3</span>
+        </div>
+        <div class="nav-item" onclick="navigate('scanner')">
+          <span class="nav-icon">📷</span> Barcode Scanner
+        </div>
+        <div class="nav-item" onclick="navigate('rfid')">
+          <span class="nav-icon">📡</span> RFID Tracker
+          <span class="nav-badge emerald">Live</span>
+        </div>
+        <div class="nav-item" onclick="navigate('transactions')">
+          <span class="nav-icon">🔄</span> Transactions
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-label">Operations</div>
+        <div class="nav-item" onclick="navigate('events')">
+          <span class="nav-icon">📅</span> Catering Events
+        </div>
+        <div class="nav-item" onclick="navigate('recipes')">
+          <span class="nav-icon">📋</span> Recipes & Costing
+        </div>
+        <div class="nav-item" onclick="navigate('procurement')">
+          <span class="nav-icon">🛒</span> Procurement
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-label">Intelligence</div>
+        <div class="nav-item" onclick="navigate('ai')">
+          <span class="nav-icon">🤖</span> AI Assistant
+        </div>
+        <div class="nav-item" onclick="navigate('reports')">
+          <span class="nav-icon">📊</span> Reports
+        </div>
+        <div class="nav-item" onclick="navigate('analytics')">
+          <span class="nav-icon">📈</span> Analytics
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-label">System</div>
+        <div class="nav-item" onclick="navigate('vendors')">
+          <span class="nav-icon">🏭</span> Vendors
+        </div>
+        <div class="nav-item" onclick="navigate('settings')">
+          <span class="nav-icon">⚙️</span> Settings
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="user-avatar">CS</div>
+        <div class="user-info">
+          <div class="user-name">Cyril Sitchon</div>
+          <div class="user-role">Administrator</div>
+        </div>
+        <div class="ws-dot" title="WebSocket Connected"></div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="main-content" id="mainContent">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <button class="topbar-toggle" onclick="toggleSidebar()" title="Toggle Sidebar">☰</button>
+      <div class="topbar-title" id="topbarTitle">Dashboard</div>
+
+      <div class="topbar-search">
+        <span style="color:var(--text-muted);font-size:0.9rem">🔍</span>
+        <input type="text" placeholder="Search inventory, events, items..." id="globalSearch" onkeyup="handleSearch(this.value)">
+        <span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);background:var(--bg-elevated);padding:2px 6px;border-radius:4px">⌘K</span>
+      </div>
+
+      <div class="topbar-actions">
+        <!-- WS Status -->
+        <div style="display:flex;align-items:center;gap:6px;padding:0 10px;height:36px;background:var(--bg-surface);border:1px solid var(--border);border-radius:9px;font-family:var(--font-mono);font-size:0.65rem;color:var(--accent-emerald)">
+          <div class="ws-dot"></div> LIVE
+        </div>
+
+        <!-- Offline indicator -->
+        <button class="icon-btn" title="Offline Queue" id="offlineBtn">
+          📶
+          <span class="badge" id="offlineCount" style="display:none">0</span>
+        </button>
+
+        <!-- Scanner quick launch -->
+        <button class="icon-btn" title="Quick Scan" onclick="navigate('scanner')">📷</button>
+
+        <!-- Notifications -->
+        <button class="icon-btn" title="Notifications" onclick="toggleNotifPanel()">
+          🔔
+          <span class="badge">5</span>
+        </button>
+
+        <!-- AI -->
+        <button class="icon-btn" title="AI Assistant" onclick="navigate('ai')" style="border-color:rgba(139,92,246,0.4);color:#a78bfa">
+          🤖
+        </button>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="page-content" id="pageContent">
+      <!-- Content rendered by JS -->
+    </main>
+
+  </div>
+</div>
+
+<!-- Add/Edit Inventory Modal -->
+<div class="modal-overlay" id="inventoryModal" style="display:none" onclick="closeModal('inventoryModal')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span style="font-size:1.2rem">📦</span>
+      <div class="modal-title" id="inventoryModalTitle">Add Inventory Item</div>
+      <button class="modal-close" onclick="closeModal('inventoryModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Item Name *</label>
+          <input type="text" class="form-control" id="itemName" placeholder="e.g. Chicken Breast">
+        </div>
+        <div class="form-group">
+          <label class="form-label">SKU / Barcode</label>
+          <input type="text" class="form-control" id="itemSKU" placeholder="Auto-generated">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select class="form-control" id="itemCategory">
+            <option value="">Select category</option>
+            <option>Meat & Poultry</option>
+            <option>Seafood</option>
+            <option>Vegetables</option>
+            <option>Dry Goods</option>
+            <option>Dairy</option>
+            <option>Beverages</option>
+            <option>Equipment</option>
+            <option>Condiments</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unit of Measure</label>
+          <select class="form-control" id="itemUnit">
+            <option>kg</option><option>g</option><option>L</option>
+            <option>mL</option><option>pcs</option><option>box</option>
+            <option>pack</option><option>bag</option><option>bottle</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Current Quantity</label>
+          <input type="number" class="form-control" id="itemQty" placeholder="0" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reorder Level</label>
+          <input type="number" class="form-control" id="itemReorder" placeholder="Trigger alert at">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Unit Cost (₱)</label>
+          <input type="number" class="form-control" id="itemCost" placeholder="0.00" step="0.01">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Expiry Date</label>
+          <input type="date" class="form-control" id="itemExpiry">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Storage Location</label>
+          <select class="form-control" id="itemLocation">
+            <option>Main Warehouse</option>
+            <option>Kitchen Cold Storage</option>
+            <option>Kitchen Dry Storage</option>
+            <option>Event Van A</option>
+            <option>Event Van B</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">RFID Tag ID</label>
+          <input type="text" class="form-control" id="itemRFID" placeholder="Tap RFID tag or enter ID">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-control" id="itemNotes" placeholder="Supplier info, special handling..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('inventoryModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveInventoryItem()">💾 Save Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- Event Modal -->
+<div class="modal-overlay" id="eventModal" style="display:none" onclick="closeModal('eventModal')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span style="font-size:1.2rem">📅</span>
+      <div class="modal-title">Add Catering Event</div>
+      <button class="modal-close" onclick="closeModal('eventModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Event Name *</label>
+        <input type="text" class="form-control" placeholder="e.g. Dela Cruz Wedding Reception">
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Client Name</label>
+          <input type="text" class="form-control" placeholder="Client full name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contact Number</label>
+          <input type="text" class="form-control" placeholder="09xxxxxxxxx">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Event Date</label>
+          <input type="date" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Guest Count</label>
+          <input type="number" class="form-control" placeholder="100">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Venue</label>
+        <input type="text" class="form-control" placeholder="Venue name and address">
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Package</label>
+          <select class="form-control">
+            <option>Silver Package</option>
+            <option>Gold Package</option>
+            <option>Platinum Package</option>
+            <option>Custom</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-control">
+            <option>Tentative</option>
+            <option>Confirmed</option>
+            <option>In Progress</option>
+            <option>Completed</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('eventModal')">Cancel</button>
+      <button class="btn btn-primary">📅 Create Event</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// APPETINA IMS — ENTERPRISE CATERING INVENTORY SYSTEM
+// Architecture: GitHub Pages + Google Apps Script + AI
+// ═══════════════════════════════════════════════════
+
+// ── Configuration ──────────────────────────────────
+const CONFIG = {
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbxtzf1cej3TWJPa7oSou7MSvtHufSOy7_HCpsP6Z3m21aDZw5UeDTYyrA8PG8N7vI27/exec',
+  WS_URL: 'wss://appetina-realtime.up.railway.app',
+  AI_ENABLED: true,
+  OFFLINE_ENABLED: true,
+  RFID_ENABLED: true,
+  VERSION: '2.0.0',
+  BRANCH: 'Iligan City Main',
+};
+
+// ── State Management ──────────────────────────────
+const STATE = {
+  currentPage: 'dashboard',
+  user: { name: 'Cyril Sitchon', role: 'admin', avatar: 'CS' },
+  wsConnected: true,
+  offlineQueue: [],
+  notifications: [],
+  inventory: [],
+  events: [],
+  rfidTags: [],
+  aiMessages: [],
+  scanHistory: [],
+};
+
+// ── Mock Data ─────────────────────────────────────
+const MOCK = {
+  inventory: [
+    { id:'INV001', name:'Chicken Breast', sku:'CHKN-BR-001', cat:'Meat & Poultry', qty:45, unit:'kg', cost:280, reorder:20, location:'Kitchen Cold Storage', expiry:'2026-06-05', status:'good', rfid:'RFID-A1B2' },
+    { id:'INV002', name:'Jasmine Rice (50kg bag)', sku:'RICE-JAS-50', cat:'Dry Goods', qty:8, unit:'bag', cost:2100, reorder:10, location:'Main Warehouse', expiry:'2027-01-15', status:'low', rfid:null },
+    { id:'INV003', name:'Fresh Tomatoes', sku:'VEG-TOM-001', cat:'Vegetables', qty:12, unit:'kg', cost:65, reorder:15, location:'Kitchen Cold Storage', expiry:'2026-06-02', status:'expiring', rfid:null },
+    { id:'INV004', name:'Cooking Oil (18L)', sku:'OIL-COOK-18', cat:'Condiments', qty:6, unit:'bottle', cost:1800, reorder:4, location:'Kitchen Dry Storage', expiry:'2026-12-31', status:'good', rfid:null },
+    { id:'INV005', name:'Pork Belly', sku:'PORK-BLY-001', cat:'Meat & Poultry', qty:28, unit:'kg', cost:320, reorder:15, location:'Kitchen Cold Storage', expiry:'2026-06-04', status:'expiring', rfid:'RFID-C3D4' },
+    { id:'INV006', name:'All-Purpose Flour', sku:'DRY-FLOUR-01', cat:'Dry Goods', qty:35, unit:'kg', cost:58, reorder:20, location:'Main Warehouse', expiry:'2026-10-20', status:'good', rfid:null },
+    { id:'INV007', name:'San Miguel Beer (case)', sku:'BEV-SMB-24', cat:'Beverages', qty:24, unit:'case', cost:750, reorder:12, location:'Main Warehouse', expiry:'2026-09-30', status:'good', rfid:null },
+    { id:'INV008', name:'Soy Sauce (1L)', sku:'COND-SOY-1L', cat:'Condiments', qty:18, unit:'bottle', cost:85, reorder:10, location:'Kitchen Dry Storage', expiry:'2027-03-15', status:'good', rfid:null },
+    { id:'INV009', name:'Shrimp (frozen)', sku:'SEA-SHMP-001', cat:'Seafood', qty:5, unit:'kg', cost:560, reorder:8, location:'Kitchen Cold Storage', expiry:'2026-06-10', status:'low', rfid:'RFID-E5F6' },
+    { id:'INV010', name:'Onions', sku:'VEG-ONI-001', cat:'Vegetables', qty:22, unit:'kg', cost:55, reorder:10, location:'Main Warehouse', expiry:'2026-07-15', status:'good', rfid:null },
+  ],
+  events: [
+    { id:'EVT001', name:'Dela Cruz Wedding', client:'Maria Dela Cruz', date:'2026-06-15', guests:300, venue:'Iligan Grand Ballroom', package:'Platinum', status:'confirmed', value:185000 },
+    { id:'EVT002', name:'LDCU Graduation Dinner', client:'La Salle', date:'2026-06-20', guests:150, venue:'School Cafeteria', package:'Gold', status:'confirmed', value:67500 },
+    { id:'EVT003', name:'Reyes Birthday Party', client:'Jose Reyes', date:'2026-07-05', guests:80, venue:'Reyes Residence', package:'Silver', status:'tentative', value:32000 },
+    { id:'EVT004', name:'Corporate Annual Gala', client:'Lanao Devt Corp', date:'2026-07-18', guests:200, venue:'MSU Convention Center', package:'Platinum', status:'confirmed', value:220000 },
+    { id:'EVT005', name:'Santos Christening', client:'Ana Santos', date:'2026-06-30', guests:60, venue:'St. Michael Parish Hall', package:'Silver', status:'tentative', value:24000 },
+  ],
+  rfidTags: [
+    { id:'RFID-A1B2', name:'Chafing Dish Set A', type:'equipment', location:'Main Warehouse', status:'active', lastSeen:'2 min ago' },
+    { id:'RFID-C3D4', name:'Buffet Table Set 1', type:'equipment', location:'Event Van A', status:'active', lastSeen:'15 min ago' },
+    { id:'RFID-E5F6', name:'Serving Trolley #1', type:'equipment', location:'Kitchen', status:'active', lastSeen:'1 hr ago' },
+    { id:'RFID-G7H8', name:'Catering Crate #3', type:'crate', location:'UNKNOWN', status:'missing', lastSeen:'2 days ago' },
+    { id:'RFID-I9J0', name:'Ice Chest Cooler A', type:'equipment', location:'Main Warehouse', status:'active', lastSeen:'30 min ago' },
+    { id:'RFID-K1L2', name:'Plate Rack Set B', type:'equipment', location:'Event Van B', status:'active', lastSeen:'45 min ago' },
+    { id:'RFID-M3N4', name:'Cutlery Box #2', type:'equipment', location:'Kitchen', status:'inactive', lastSeen:'3 days ago' },
+    { id:'RFID-O5P6', name:'Catering Crate #7', type:'crate', location:'Main Warehouse', status:'active', lastSeen:'5 min ago' },
+  ],
+  notifications: [
+    { type:'danger', title:'Critical: Low Stock Alert', desc:'Jasmine Rice below reorder level (8 bags, min: 10)', time:'2 min ago', icon:'⚠️' },
+    { type:'amber', title:'Expiry Warning', desc:'Fresh Tomatoes expiring in 5 days (12 kg)', time:'15 min ago', icon:'⏰' },
+    { type:'amber', title:'Expiry Warning', desc:'Pork Belly expiring in 7 days (28 kg)', time:'18 min ago', icon:'⏰' },
+    { type:'danger', title:'Missing Equipment', desc:'Catering Crate #3 (RFID-G7H8) not detected for 2 days', time:'1 hr ago', icon:'📡' },
+    { type:'cyan', title:'Event Tomorrow', desc:'LDCU Graduation Dinner — 150 guests, School Cafeteria', time:'3 hr ago', icon:'📅' },
+  ],
+  scanHistory: [
+    { barcode:'CHKN-BR-001', name:'Chicken Breast', action:'Stock In', qty:'+20 kg', time:'10:45 AM', operator:'Staff A' },
+    { barcode:'RICE-JAS-50', name:'Jasmine Rice', action:'Stock Out', qty:'-2 bag', time:'10:12 AM', operator:'Staff B' },
+    { barcode:'PORK-BLY-001', name:'Pork Belly', action:'Stock Check', qty:'28 kg', time:'09:55 AM', operator:'Admin' },
+    { barcode:'VEG-TOM-001', name:'Fresh Tomatoes', action:'Stock Out', qty:'-5 kg', time:'09:30 AM', operator:'Staff A' },
+    { barcode:'BEV-SMB-24', name:'San Miguel Beer', action:'Stock In', qty:'+6 case', time:'09:00 AM', operator:'Staff C' },
+  ],
+  liveActivity: [
+    { color:'#10b981', text:'<strong>Staff A</strong> scanned Chicken Breast — Stock In +20 kg', time:'2m' },
+    { color:'#3b82f6', text:'<strong>RFID-C3D4</strong> Buffet Table detected at Event Van A', time:'4m' },
+    { color:'#f59e0b', text:'<strong>System</strong> Low stock alert triggered for Jasmine Rice', time:'8m' },
+    { color:'#06b6d4', text:'<strong>AI</strong> Generated purchase recommendation for 15 items', time:'12m' },
+    { color:'#10b981', text:'<strong>Staff B</strong> received delivery from Agri-Fresh Supplier', time:'18m' },
+    { color:'#8b5cf6', text:'<strong>Admin</strong> confirmed EVT002 LDCU Graduation Dinner', time:'25m' },
+    { color:'#f43f5e', text:'<strong>RFID Alert</strong> Crate #3 not detected — marked missing', time:'1h' },
+  ],
+  vendors: [
+    { id:'VEN001', name:'Agri-Fresh Suppliers', contact:'0917-123-4567', category:'Produce', rating:4.8, orders:24 },
+    { id:'VEN002', name:'Metro Meat Center', contact:'0918-234-5678', category:'Meat', rating:4.6, orders:18 },
+    { id:'VEN003', name:'Iligan Seafood Market', contact:'0919-345-6789', category:'Seafood', rating:4.5, orders:12 },
+    { id:'VEN004', name:'Golden Rice Trading', contact:'0920-456-7890', category:'Grains', rating:4.9, orders:30 },
+    { id:'VEN005', name:'City Beverage Corp', contact:'0921-567-8901', category:'Beverages', rating:4.3, orders:15 },
+  ],
+};
+
+// Populate state
+STATE.inventory = MOCK.inventory;
+STATE.events = MOCK.events;
+STATE.rfidTags = MOCK.rfidTags;
+STATE.notifications = MOCK.notifications;
+
+// ── Boot Sequence ──────────────────────────────────
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    const boot = document.getElementById('boot');
+    boot.style.transition = 'opacity 0.5s ease';
+    boot.style.opacity = '0';
+    setTimeout(() => { boot.style.display = 'none'; }, 500);
+    renderPage('dashboard');
+    renderNotifications();
+    simulateRealtime();
+  }, 2200);
+});
+
+// ── Navigation ─────────────────────────────────────
+function navigate(page) {
+  STATE.currentPage = page;
+
+  // Update active nav
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.remove('active');
+    if (el.getAttribute('onclick')?.includes(`'${page}'`)) el.classList.add('active');
+  });
+
+  // Update topbar title
+  const titles = {
+    dashboard:'Dashboard', inventory:'Inventory Management',
+    scanner:'Barcode Scanner', rfid:'RFID Tracker',
+    transactions:'Transaction History', events:'Catering Events',
+    recipes:'Recipes & Food Costing', procurement:'Procurement',
+    ai:'AI Assistant', reports:'Reports & Analytics',
+    analytics:'Analytics', vendors:'Vendor Management',
+    settings:'System Settings', notifications:'Notifications & Alerts',
+  };
+  document.getElementById('topbarTitle').textContent = titles[page] || page;
+
+  renderPage(page);
+
+  // Close mobile sidebar
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('mobileOverlay').classList.remove('show');
+  }
+}
+
+function renderPage(page) {
+  const content = document.getElementById('pageContent');
+  const renderers = {
+    dashboard: renderDashboard,
+    inventory: renderInventory,
+    scanner: renderScanner,
+    rfid: renderRFID,
+    transactions: renderTransactions,
+    events: renderEvents,
+    recipes: renderRecipes,
+    procurement: renderProcurement,
+    ai: renderAI,
+    reports: renderReports,
+    analytics: renderAnalytics,
+    vendors: renderVendors,
+    settings: renderSettings,
+    notifications: renderNotificationsPage,
+  };
+  if (renderers[page]) {
+    content.innerHTML = '';
+    renderers[page](content);
+  }
+}
+
+// ── Dashboard ──────────────────────────────────────
+function renderDashboard(el) {
+  const lowStock = STATE.inventory.filter(i => i.status === 'low').length;
+  const expiring = STATE.inventory.filter(i => i.status === 'expiring').length;
+  const totalValue = STATE.inventory.reduce((s,i) => s + i.qty * i.cost, 0);
+  const upcomingEvents = STATE.events.filter(e => e.status === 'confirmed').length;
+
+  el.innerHTML = `
+  <!-- Stats Row -->
+  <div class="stat-grid">
+    <div class="stat-card blue" onclick="navigate('inventory')" style="cursor:pointer">
+      <div class="stat-icon">📦</div>
+      <div class="stat-value">${STATE.inventory.length}</div>
+      <div class="stat-label">Total Inventory Items</div>
+      <div class="stat-change up">↑ 3 added this week</div>
+    </div>
+    <div class="stat-card amber" onclick="navigate('inventory')" style="cursor:pointer">
+      <div class="stat-icon">⚠️</div>
+      <div class="stat-value">${lowStock}</div>
+      <div class="stat-label">Low Stock Alerts</div>
+      <div class="stat-change warn">⚡ Requires attention</div>
+    </div>
+    <div class="stat-card rose" onclick="navigate('inventory')" style="cursor:pointer">
+      <div class="stat-icon">⏰</div>
+      <div class="stat-value">${expiring}</div>
+      <div class="stat-label">Items Expiring Soon</div>
+      <div class="stat-change down">↓ within 7 days</div>
+    </div>
+    <div class="stat-card emerald" onclick="navigate('events')" style="cursor:pointer">
+      <div class="stat-icon">📅</div>
+      <div class="stat-value">${upcomingEvents}</div>
+      <div class="stat-label">Upcoming Events</div>
+      <div class="stat-change up">↑ 1 new this week</div>
+    </div>
+    <div class="stat-card cyan" onclick="navigate('rfid')" style="cursor:pointer">
+      <div class="stat-icon">📡</div>
+      <div class="stat-value">${STATE.rfidTags.filter(t=>t.status==='active').length}</div>
+      <div class="stat-label">RFID Tags Active</div>
+      <div class="stat-change warn">1 tag missing</div>
+    </div>
+    <div class="stat-card violet">
+      <div class="stat-icon">💰</div>
+      <div class="stat-value">₱${(totalValue/1000).toFixed(0)}K</div>
+      <div class="stat-label">Inventory Value</div>
+      <div class="stat-change up">↑ +₱18K this month</div>
+    </div>
+  </div>
+
+  <!-- Alerts Row -->
+  <div class="mb-6" id="alertsRow">
+    ${STATE.notifications.slice(0,2).map(n => `
+      <div class="alert ${n.type === 'danger' ? 'danger' : n.type === 'amber' ? 'warning' : 'info'} mb-2">
+        <span>${n.icon}</span>
+        <div>
+          <div style="font-weight:600;margin-bottom:2px">${n.title}</div>
+          <div>${n.desc}</div>
+        </div>
+        <div style="margin-left:auto;font-family:var(--font-mono);font-size:0.65rem;opacity:0.7">${n.time}</div>
+      </div>
+    `).join('')}
+  </div>
+
+  <!-- Main Grid -->
+  <div class="content-grid">
+    <div>
+      <!-- Inventory Overview -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <span>📦</span>
+          <div class="card-title">Inventory Overview</div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm" onclick="navigate('inventory')">View All</button>
+            <button class="btn btn-primary btn-sm" onclick="openModal('inventoryModal')">+ Add</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Item</th><th>Category</th><th>Qty</th><th>Status</th><th>Location</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${STATE.inventory.slice(0,6).map(item => `
+              <tr>
+                <td>
+                  <div style="font-weight:600;color:var(--text-primary)">${item.name}</div>
+                  <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted)">${item.sku}</div>
+                </td>
+                <td><span class="badge muted">${item.cat}</span></td>
+                <td>
+                  <div style="font-weight:600">${item.qty} ${item.unit}</div>
+                  <div style="margin-top:4px">
+                    <div class="progress-bar" style="width:80px">
+                      <div class="progress-fill ${item.status==='good'?'emerald':item.status==='low'?'amber':'rose'}"
+                        style="width:${Math.min(100,(item.qty/item.reorder)*50)}%"></div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <span class="badge ${item.status==='good'?'success':item.status==='low'?'warning':'danger'}">
+                    ${item.status==='good'?'✓ Good':item.status==='low'?'⚠ Low':'⏰ Expiring'}
+                  </span>
+                </td>
+                <td style="color:var(--text-muted);font-size:0.78rem">${item.location.split(' ').slice(0,2).join(' ')}</td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button class="btn btn-secondary btn-sm btn-icon" title="Edit" onclick="editItem('${item.id}')">✏️</button>
+                    <button class="btn btn-secondary btn-sm btn-icon" title="Scan" onclick="navigate('scanner')">📷</button>
+                  </div>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Upcoming Events -->
+      <div class="card">
+        <div class="card-header">
+          <span>📅</span>
+          <div class="card-title">Upcoming Events</div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm" onclick="navigate('events')">View All</button>
+            <button class="btn btn-primary btn-sm" onclick="openModal('eventModal')">+ Add</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr><th>Event</th><th>Date</th><th>Guests</th><th>Value</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              ${STATE.events.map(ev => `
+              <tr onclick="navigate('events')" style="cursor:pointer">
+                <td>
+                  <div style="font-weight:600;color:var(--text-primary)">${ev.name}</div>
+                  <div style="font-size:0.75rem;color:var(--text-muted)">${ev.venue}</div>
+                </td>
+                <td style="font-family:var(--font-mono);font-size:0.78rem">${formatDate(ev.date)}</td>
+                <td>${ev.guests}</td>
+                <td style="font-weight:600;color:var(--accent-emerald)">₱${ev.value.toLocaleString()}</td>
+                <td><span class="badge ${ev.status==='confirmed'?'success':ev.status==='tentative'?'warning':'info'}">${ev.status}</span></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div>
+      <!-- Live Activity -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <div class="ws-dot"></div>
+          <div class="card-title">Live Activity</div>
+          <span style="font-family:var(--font-mono);font-size:0.62rem;color:var(--accent-emerald);margin-left:auto">LIVE</span>
+        </div>
+        <div class="card-body" style="padding:8px">
+          <div class="live-feed" id="liveFeed">
+            ${MOCK.liveActivity.map(a => `
+            <div class="feed-item">
+              <div class="feed-dot" style="background:${a.color}"></div>
+              <div class="feed-text">${a.text}</div>
+              <div class="feed-time">${a.time}</div>
+            </div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- RFID Quick Status -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <span>📡</span>
+          <div class="card-title">RFID Status</div>
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="navigate('rfid')">Full View</button>
+        </div>
+        <div class="card-body" style="padding:12px">
+          ${STATE.rfidTags.slice(0,4).map(tag => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;margin-bottom:4px;background:var(--bg-elevated)">
+            <div style="width:8px;height:8px;border-radius:50%;background:${tag.status==='active'?'var(--accent-emerald)':tag.status==='missing'?'var(--accent-rose)':'var(--text-muted)'};
+              box-shadow:${tag.status==='active'?'0 0 6px var(--accent-emerald)':tag.status==='missing'?'0 0 6px var(--accent-rose)':'none'}"></div>
+            <div style="flex:1">
+              <div style="font-size:0.8rem;font-weight:600">${tag.name}</div>
+              <div style="font-size:0.7rem;color:var(--text-muted)">${tag.location}</div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted)">${tag.lastSeen}</div>
+          </div>`).join('')}
+          <div style="margin-top:8px;padding:8px;background:rgba(244,63,94,0.08);border:1px solid rgba(244,63,94,0.2);border-radius:8px">
+            <div style="font-size:0.78rem;font-weight:600;color:#f43f5e">⚠ 1 Tag Missing</div>
+            <div style="font-size:0.72rem;color:var(--text-muted)">Catering Crate #3 — last seen 2 days ago</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick AI Query -->
+      <div class="card">
+        <div class="card-header">
+          <span>🤖</span>
+          <div class="card-title">AI Quick Query</div>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px" id="quickAIBtns">
+            ${[
+              '📊 Show low stock items',
+              '🔮 Forecast next week',
+              '🛒 Purchase recommendations',
+              '⏰ Expiring items report',
+            ].map(q => `<button class="btn btn-secondary btn-sm" onclick="quickAIQuery('${q}')" style="text-align:left;justify-content:flex-start">${q}</button>`).join('')}
+          </div>
+          <div id="quickAIResult" style="display:none;background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:12px;font-size:0.82rem;color:var(--text-secondary);line-height:1.6"></div>
+          <button class="btn btn-primary btn-sm w-full" style="margin-top:12px" onclick="navigate('ai')">Open Full AI Assistant →</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Inventory Page ─────────────────────────────────
+function renderInventory(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">Stock Management</h2>
+      <p class="text-muted text-sm" style="margin-top:2px">Real-time inventory tracking for Iligan City operations</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" onclick="exportInventory()">📥 Export CSV</button>
+      <button class="btn btn-secondary" onclick="importInventory()">📤 Import</button>
+      <button class="btn btn-primary" onclick="openModal('inventoryModal')">+ Add Item</button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card mb-4">
+    <div class="card-body" style="padding:14px 20px">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <div class="topbar-search" style="max-width:280px;background:var(--bg-surface)">
+          <span style="color:var(--text-muted)">🔍</span>
+          <input type="text" placeholder="Search items..." oninput="filterInventory(this.value)" style="flex:1;background:none;border:none;outline:none;color:var(--text-primary);font-size:0.85rem">
+        </div>
+        <select class="form-control" style="width:auto" onchange="filterByCategory(this.value)">
+          <option value="">All Categories</option>
+          <option>Meat & Poultry</option><option>Seafood</option>
+          <option>Vegetables</option><option>Dry Goods</option>
+          <option>Dairy</option><option>Beverages</option>
+          <option>Equipment</option><option>Condiments</option>
+        </select>
+        <select class="form-control" style="width:auto" onchange="filterByStatus(this.value)">
+          <option value="">All Status</option>
+          <option>good</option><option>low</option><option>expiring</option>
+        </select>
+        <select class="form-control" style="width:auto">
+          <option value="">All Locations</option>
+          <option>Main Warehouse</option>
+          <option>Kitchen Cold Storage</option>
+          <option>Kitchen Dry Storage</option>
+        </select>
+        <div style="margin-left:auto;font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted)">
+          ${STATE.inventory.length} items total
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Summary -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px" id="invStats">
+    ${[
+      { label:'Total Items', val: STATE.inventory.length, col:'blue' },
+      { label:'Good Stock', val: STATE.inventory.filter(i=>i.status==='good').length, col:'emerald' },
+      { label:'Low Stock', val: STATE.inventory.filter(i=>i.status==='low').length, col:'amber' },
+      { label:'Expiring Soon', val: STATE.inventory.filter(i=>i.status==='expiring').length, col:'rose' },
+      { label:'RFID Tagged', val: STATE.inventory.filter(i=>i.rfid).length, col:'violet' },
+    ].map(s => `
+    <div class="stat-card ${s.col}" style="padding:14px">
+      <div class="stat-value" style="font-size:1.6rem">${s.val}</div>
+      <div class="stat-label">${s.label}</div>
+    </div>`).join('')}
+  </div>
+
+  <!-- Inventory Table -->
+  <div class="card">
+    <div style="overflow-x:auto">
+      <table class="data-table" id="inventoryTable">
+        <thead>
+          <tr>
+            <th><input type="checkbox" style="accent-color:var(--accent-primary)"></th>
+            <th>ITEM / SKU</th><th>CATEGORY</th><th>QUANTITY</th>
+            <th>UNIT COST</th><th>TOTAL VALUE</th>
+            <th>LOCATION</th><th>EXPIRY</th><th>STATUS</th>
+            <th>RFID</th><th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody id="inventoryTableBody">
+          ${renderInventoryRows(STATE.inventory)}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderInventoryRows(items) {
+  return items.map(item => `
+  <tr>
+    <td><input type="checkbox" style="accent-color:var(--accent-primary)"></td>
+    <td>
+      <div style="font-weight:600;color:var(--text-primary)">${item.name}</div>
+      <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted)">${item.sku}</div>
+    </td>
+    <td><span class="badge muted">${item.cat}</span></td>
+    <td>
+      <div style="font-weight:600">${item.qty} ${item.unit}</div>
+      <div class="progress-bar" style="width:60px;margin-top:4px">
+        <div class="progress-fill ${item.status==='good'?'emerald':item.status==='low'?'amber':'rose'}" style="width:${Math.min(100,(item.qty/(item.reorder*2))*100)}%"></div>
+      </div>
+    </td>
+    <td style="font-family:var(--font-mono)">₱${item.cost.toLocaleString()}</td>
+    <td style="font-family:var(--font-mono);font-weight:600;color:var(--accent-cyan)">₱${(item.qty*item.cost).toLocaleString()}</td>
+    <td style="font-size:0.78rem;color:var(--text-muted)">${item.location}</td>
+    <td>
+      <div style="font-family:var(--font-mono);font-size:0.75rem;color:${item.expiry && new Date(item.expiry) < new Date(Date.now()+7*86400000)?'var(--accent-amber)':'var(--text-muted)'}">${item.expiry || '—'}</div>
+    </td>
+    <td>
+      <span class="badge ${item.status==='good'?'success':item.status==='low'?'warning':'danger'}">
+        ${item.status==='good'?'✓ Good':item.status==='low'?'⚠ Low':'⏰ Expiring'}
+      </span>
+    </td>
+    <td>
+      ${item.rfid ? `<span class="badge cyan">📡 ${item.rfid}</span>` : '<span class="badge muted">—</span>'}
+    </td>
+    <td>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-secondary btn-sm btn-icon" title="Edit" onclick="editItem('${item.id}')">✏️</button>
+        <button class="btn btn-secondary btn-sm btn-icon" title="Stock In/Out" onclick="stockAdjust('${item.id}')">±</button>
+        <button class="btn btn-danger btn-sm btn-icon" title="Delete">🗑</button>
+      </div>
+    </td>
+  </tr>`).join('');
+}
+
+// ── Scanner Page ───────────────────────────────────
+function renderScanner(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">Barcode Scanner</h2>
+      <p class="text-muted text-sm">Camera • USB HID • Bluetooth • Manual Entry</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" onclick="clearScanHistory()">🗑 Clear History</button>
+      <button class="btn btn-primary" id="scanToggle" onclick="toggleCamera()">📷 Start Camera</button>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div>
+      <!-- Scanner View -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <span>📷</span>
+          <div class="card-title">Camera Scanner</div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <span class="badge" id="scanMode" style="background:rgba(6,182,212,0.12);color:#06b6d4;border:1px solid rgba(6,182,212,0.2)">READY</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="scanner-container mb-4" id="scannerBox">
+            <div style="display:flex;align-items:center;justify-content:center;height:100%;background:var(--bg-surface);color:var(--text-muted);flex-direction:column;gap:12px;padding:40px">
+              <span style="font-size:3rem">📷</span>
+              <div style="font-size:0.88rem;text-align:center">Click "Start Camera" to activate barcode scanning<br>
+                <span style="font-size:0.75rem;color:var(--text-muted)">Supports QR, EAN-13, UPC, Code128</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mode Toggle -->
+          <div class="tab-list mb-4">
+            <button class="tab active" onclick="setScanMode('camera',this)">📷 Camera</button>
+            <button class="tab" onclick="setScanMode('usb',this)">🔌 USB HID</button>
+            <button class="tab" onclick="setScanMode('manual',this)">⌨️ Manual</button>
+            <button class="tab" onclick="setScanMode('nfc',this)">📡 NFC/RFID</button>
+          </div>
+
+          <!-- Manual Entry -->
+          <div id="manualEntry" style="display:flex;gap:8px">
+            <input type="text" id="manualBarcode" class="form-control" placeholder="Enter or scan barcode / SKU / RFID tag ID..."
+              onkeydown="if(event.key==='Enter')processBarcode(this.value)">
+            <button class="btn btn-primary" onclick="processBarcode(document.getElementById('manualBarcode').value)">🔍 Lookup</button>
+          </div>
+
+          <!-- Scan Result -->
+          <div id="scanResult" style="display:none;margin-top:16px;padding:16px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:var(--radius)">
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px">
+            <button class="btn btn-primary" onclick="scanAction('in')">📥 Stock IN</button>
+            <button class="btn btn-secondary" onclick="scanAction('out')">📤 Stock OUT</button>
+            <button class="btn btn-secondary" onclick="scanAction('check')">🔍 Stock Check</button>
+            <button class="btn btn-secondary" onclick="scanAction('transfer')">🔄 Transfer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scan History -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <span>📋</span>
+          <div class="card-title">Scan History</div>
+          <span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);margin-left:auto">${MOCK.scanHistory.length} scans today</span>
+        </div>
+        <div style="overflow:hidden">
+          ${MOCK.scanHistory.map(s => `
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border);transition:background var(--transition)" onmouseover="this.style.background='var(--bg-elevated)'" onmouseout="this.style.background=''">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <div style="font-weight:600;font-size:0.85rem">${s.name}</div>
+              <span class="badge ${s.action==='Stock In'?'success':s.action==='Stock Out'?'danger':'info'}">${s.action}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+              <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted)">${s.barcode}</div>
+              <div style="font-size:0.72rem;color:var(--text-muted)">${s.time} · ${s.operator}</div>
+            </div>
+            <div style="font-family:var(--font-mono);font-weight:600;font-size:0.75rem;color:${s.qty.startsWith('+')?'var(--accent-emerald)':'var(--accent-rose)'};margin-top:2px">${s.qty}</div>
+          </div>`).join('')}
+        </div>
+
+        <!-- USB HID Info -->
+        <div style="padding:14px 16px;background:rgba(6,182,212,0.05);border-top:1px solid var(--border)">
+          <div style="font-size:0.75rem;color:var(--text-muted);line-height:1.5">
+            <strong style="color:var(--accent-cyan)">🔌 USB Scanner Mode:</strong><br>
+            Just plug in any HID-compatible USB barcode scanner. It will simulate keyboard input — scan directly into any focused field. Auto-detection enabled.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── RFID Page ──────────────────────────────────────
+function renderRFID(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">RFID Tracker</h2>
+      <p class="text-muted text-sm">Real-time equipment & crate tracking via NFC/RFID</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" onclick="startNFCScan()">📱 Scan NFC Tag</button>
+      <button class="btn btn-primary" onclick="addRFIDTag()">+ Register Tag</button>
+    </div>
+  </div>
+
+  <!-- RFID Stats -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">
+    ${[
+      { label:'Total Tags', val: STATE.rfidTags.length, col:'blue', icon:'📡' },
+      { label:'Active', val: STATE.rfidTags.filter(t=>t.status==='active').length, col:'emerald', icon:'✅' },
+      { label:'Missing', val: STATE.rfidTags.filter(t=>t.status==='missing').length, col:'rose', icon:'⚠️' },
+      { label:'Inactive', val: STATE.rfidTags.filter(t=>t.status==='inactive').length, col:'amber', icon:'⏸' },
+    ].map(s => `
+    <div class="stat-card ${s.col}" style="padding:14px">
+      <div style="font-size:1.5rem;margin-bottom:8px">${s.icon}</div>
+      <div class="stat-value" style="font-size:1.8rem">${s.val}</div>
+      <div class="stat-label">${s.label}</div>
+    </div>`).join('')}
+  </div>
+
+  <div class="content-grid">
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="ws-dot"></div>
+          <div class="card-title">Live RFID Dashboard</div>
+          <span class="badge success" style="margin-left:auto">SCANNING</span>
+        </div>
+        <div class="card-body">
+          <div class="rfid-grid" id="rfidGrid">
+            ${STATE.rfidTags.map(tag => `
+            <div class="rfid-tag ${tag.status}" onclick="viewRFIDTag('${tag.id}')">
+              <div class="rfid-pulse ${tag.status}"></div>
+              <div class="rfid-tag-id">${tag.id}</div>
+              <div class="rfid-tag-name">${tag.name}</div>
+              <div class="rfid-tag-loc">📍 ${tag.location}</div>
+              <div style="margin-top:8px">
+                <span class="badge ${tag.status==='active'?'success':tag.status==='missing'?'danger':'muted'}" style="font-size:0.6rem">
+                  ${tag.status.toUpperCase()}
+                </span>
+                <span style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);margin-left:6px">${tag.lastSeen}</span>
+              </div>
+            </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RFID Activity Log -->
+    <div>
+      <div class="card mb-4">
+        <div class="card-header">
+          <span>📋</span>
+          <div class="card-title">RFID Event Log</div>
+        </div>
+        <div style="max-height:320px;overflow-y:auto">
+          ${[
+            { tag:'RFID-C3D4', event:'Location Update', from:'Kitchen', to:'Event Van A', time:'15 min ago', col:'#3b82f6' },
+            { tag:'RFID-A1B2', event:'Scan Detected', from:null, to:'Main Warehouse', time:'18 min ago', col:'#10b981' },
+            { tag:'RFID-G7H8', event:'Missing Alert', from:'Event Van B', to:'UNKNOWN', time:'2 days ago', col:'#f43f5e' },
+            { tag:'RFID-O5P6', event:'Location Update', from:'Event Van A', to:'Main Warehouse', time:'3 days ago', col:'#10b981' },
+            { tag:'RFID-E5F6', event:'Scan Detected', from:null, to:'Kitchen', time:'1 hr ago', col:'#3b82f6' },
+          ].map(e => `
+          <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px">
+            <div style="width:8px;height:8px;border-radius:50%;background:${e.col};margin-top:4px;flex-shrink:0;box-shadow:0 0 6px ${e.col}"></div>
+            <div style="flex:1">
+              <div style="font-size:0.8rem;font-weight:600">${e.event}</div>
+              <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted)">${e.tag}</div>
+              ${e.from ? `<div style="font-size:0.72rem;color:var(--text-secondary)">${e.from} → ${e.to}</div>` : `<div style="font-size:0.72rem;color:var(--text-secondary)">@ ${e.to}</div>`}
+            </div>
+            <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted)">${e.time}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+
+      <!-- NFC Scanner -->
+      <div class="card">
+        <div class="card-header">
+          <span>📱</span>
+          <div class="card-title">NFC Scanner (Web NFC)</div>
+        </div>
+        <div class="card-body" style="text-align:center">
+          <div style="width:80px;height:80px;border:2px solid var(--accent-cyan);border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:2rem;animation:rfidPulse 2s infinite">
+            📡
+          </div>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px">Tap an NFC/RFID tag against your phone to identify and track equipment</p>
+          <button class="btn btn-primary w-full" onclick="startNFCScan()">Start NFC Scanning</button>
+          <p style="font-size:0.72rem;color:var(--text-muted);margin-top:10px">Requires Android Chrome with NFC-enabled device</p>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Events Page ────────────────────────────────────
+function renderEvents(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">Catering Events</h2>
+      <p class="text-muted text-sm">Schedule, allocate, and track all catering operations</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary">📊 Event Report</button>
+      <button class="btn btn-primary" onclick="openModal('eventModal')">+ New Event</button>
+    </div>
+  </div>
+
+  <!-- Revenue Summary -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px">
+    ${[
+      { label:'Total Events', val: STATE.events.length, col:'blue', pre:'' },
+      { label:'Confirmed', val: STATE.events.filter(e=>e.status==='confirmed').length, col:'emerald', pre:'' },
+      { label:'Tentative', val: STATE.events.filter(e=>e.status==='tentative').length, col:'amber', pre:'' },
+      { label:'Total Revenue', val: '₱' + STATE.events.reduce((s,e)=>s+e.value,0).toLocaleString(), col:'cyan', pre:'' },
+    ].map(s => `
+    <div class="stat-card ${s.col}" style="padding:14px">
+      <div class="stat-value" style="font-size:1.5rem">${s.val}</div>
+      <div class="stat-label">${s.label}</div>
+    </div>`).join('')}
+  </div>
+
+  <div class="card">
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>EVENT</th><th>CLIENT</th><th>DATE</th><th>VENUE</th>
+            <th>GUESTS</th><th>PACKAGE</th><th>VALUE</th><th>STATUS</th><th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${STATE.events.map(ev => `
+          <tr>
+            <td><div style="font-weight:600;color:var(--text-primary)">${ev.name}</div></td>
+            <td>${ev.client}</td>
+            <td style="font-family:var(--font-mono);font-size:0.78rem">${formatDate(ev.date)}</td>
+            <td style="font-size:0.78rem;color:var(--text-muted)">${ev.venue}</td>
+            <td style="font-family:var(--font-mono)">${ev.guests}</td>
+            <td><span class="badge violet">${ev.package}</span></td>
+            <td style="font-family:var(--font-mono);font-weight:600;color:var(--accent-emerald)">₱${ev.value.toLocaleString()}</td>
+            <td><span class="badge ${ev.status==='confirmed'?'success':ev.status==='tentative'?'warning':'info'}">${ev.status}</span></td>
+            <td>
+              <div style="display:flex;gap:4px">
+                <button class="btn btn-secondary btn-sm" onclick="viewEventDetails('${ev.id}')">👁 View</button>
+                <button class="btn btn-primary btn-sm">✏️ Edit</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Event Timeline -->
+  <div class="grid-2" style="margin-top:20px">
+    <div class="card">
+      <div class="card-header"><span>📅</span><div class="card-title">Event Timeline</div></div>
+      <div class="card-body">
+        <div class="timeline">
+          ${STATE.events.slice(0,4).map((ev,i) => `
+          <div class="timeline-item">
+            <div class="timeline-dot ${['blue','emerald','amber','rose'][i]}"></div>
+            <div class="timeline-content">
+              <div class="timeline-title">${ev.name}</div>
+              <div class="timeline-desc">${formatDate(ev.date)} · ${ev.guests} guests · ${ev.venue}</div>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span>💰</span><div class="card-title">Revenue by Package</div></div>
+      <div class="card-body">
+        ${['Platinum','Gold','Silver'].map(pkg => {
+          const pkgEvents = STATE.events.filter(e=>e.package===pkg);
+          const total = pkgEvents.reduce((s,e)=>s+e.value,0);
+          const max = STATE.events.reduce((s,e)=>s+e.value,0);
+          return `
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:0.83rem;font-weight:600">${pkg} Package</span>
+              <span style="font-family:var(--font-mono);font-size:0.78rem;color:var(--accent-emerald)">₱${total.toLocaleString()}</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill ${pkg==='Platinum'?'blue':pkg==='Gold'?'amber':'emerald'}" style="width:${(total/max*100).toFixed(0)}%"></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── AI Assistant Page ──────────────────────────────
+function renderAI(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">AI Assistant</h2>
+      <p class="text-muted text-sm">Powered by Claude — inventory intelligence, forecasting, and natural language queries</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:0.72rem;color:var(--accent-violet)">
+        <div style="width:7px;height:7px;border-radius:50%;background:var(--accent-violet);box-shadow:0 0 8px var(--accent-violet);animation:wsPulse 2s infinite"></div>
+        CLAUDE AI CONNECTED
+      </div>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div>
+      <!-- Chat Interface -->
+      <div class="card">
+        <div class="card-header">
+          <span style="font-size:1.2rem">🤖</span>
+          <div class="card-title">AI Chat Interface</div>
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="clearAIChat()">🗑 Clear</button>
+        </div>
+        <div class="ai-chat">
+          <div class="ai-messages" id="aiMessages">
+            <div class="ai-msg assistant">
+              👋 Hello! I'm your Appetina AI assistant. I have full context of your inventory, events, and operations in Iligan City.<br><br>
+              I can help you with:<br>
+              • Inventory forecasting and low stock predictions<br>
+              • Smart purchasing recommendations<br>
+              • Expiry and waste analysis<br>
+              • Event planning and ingredient calculations<br>
+              • Natural language inventory queries<br><br>
+              What would you like to know?
+            </div>
+          </div>
+          <div class="ai-input-row">
+            <input class="ai-input" id="aiInput" placeholder="Ask anything about your inventory..."
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIMessage()}">
+            <button class="btn btn-primary btn-sm" onclick="sendAIMessage()">Send ↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Quick Actions -->
+    <div>
+      <div class="card mb-4">
+        <div class="card-header"><span>⚡</span><div class="card-title">Quick Commands</div></div>
+        <div class="card-body">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${[
+              { icon:'📊', cmd:'Show all low stock items', label:'Low Stock Report' },
+              { icon:'🔮', cmd:'Forecast inventory needs for next week', label:'Weekly Forecast' },
+              { icon:'🛒', cmd:'Generate purchase recommendations based on upcoming events', label:'Purchase Suggestions' },
+              { icon:'⏰', cmd:'Which items are expiring within 7 days?', label:'Expiry Report' },
+              { icon:'💸', cmd:'Analyze inventory waste and suggest improvements', label:'Waste Analysis' },
+              { icon:'📅', cmd:'What ingredients do I need for the Dela Cruz Wedding?', label:'Event Planning' },
+              { icon:'📈', cmd:'Show inventory movement trends for this month', label:'Movement Analytics' },
+              { icon:'🏭', cmd:'Which vendors should I prioritize for restocking?', label:'Vendor Rankings' },
+            ].map(a => `
+            <button class="btn btn-secondary btn-sm" onclick="sendQuickCommand('${a.cmd}')" style="text-align:left;justify-content:flex-start;gap:8px">
+              <span>${a.icon}</span> ${a.label}
+            </button>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Insights Card -->
+      <div class="card">
+        <div class="card-header"><span>💡</span><div class="card-title">AI Insights</div></div>
+        <div class="card-body">
+          ${[
+            { icon:'⚠️', color:'var(--accent-amber)', text:'Jasmine Rice projected to run out in 3 days at current consumption rate' },
+            { icon:'📈', color:'var(--accent-cyan)', text:'June event revenue forecast: ₱405,000 (+12% vs May)' },
+            { icon:'🗑', color:'var(--accent-rose)', text:'Tomato waste rate 18% — recommend reducing order qty by 20%' },
+            { icon:'✅', color:'var(--accent-emerald)', text:'Procurement from Golden Rice Trading saves ₱2,400 vs current vendor' },
+          ].map(i => `
+          <div style="display:flex;gap:10px;padding:10px;border-radius:8px;background:var(--bg-elevated);margin-bottom:8px">
+            <span>${i.icon}</span>
+            <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.4;border-left:2px solid ${i.color};padding-left:8px">${i.text}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Reports Page ───────────────────────────────────
+function renderReports(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">Reports & Analytics</h2>
+      <p class="text-muted text-sm">Generate PDF, Excel, and CSV reports for all operations</p>
+    </div>
+  </div>
+
+  <div class="grid-3 mb-6">
+    ${[
+      { icon:'📦', title:'Inventory Report', desc:'Current stock levels, values, locations', types:['PDF','Excel','CSV'] },
+      { icon:'🔄', title:'Stock Movement', desc:'All in/out transactions for period', types:['PDF','Excel','CSV'] },
+      { icon:'⏰', title:'Expiry Report', desc:'Items expiring within timeframe', types:['PDF','Excel'] },
+      { icon:'🗑', title:'Waste Analysis', desc:'Inventory loss and spoilage report', types:['PDF','Excel'] },
+      { icon:'📅', title:'Event Consumption', desc:'Ingredients used per catering event', types:['PDF','Excel','CSV'] },
+      { icon:'💰', title:'Financial Summary', desc:'Revenue, costs, margins by period', types:['PDF','Excel'] },
+      { icon:'🏭', title:'Vendor Performance', desc:'Supplier orders, ratings, costs', types:['PDF','Excel','CSV'] },
+      { icon:'📡', title:'RFID Tracking', desc:'Equipment movement and location history', types:['PDF','CSV'] },
+      { icon:'🤖', title:'AI Forecast', desc:'AI-generated predictions and insights', types:['PDF'] },
+    ].map(r => `
+    <div class="card" style="padding:0">
+      <div class="card-body">
+        <div style="font-size:1.5rem;margin-bottom:10px">${r.icon}</div>
+        <div style="font-weight:700;margin-bottom:4px">${r.title}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:14px">${r.desc}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${r.types.map(t => `<button class="btn btn-secondary btn-sm" onclick="generateReport('${r.title}','${t}')">📄 ${t}</button>`).join('')}
+        </div>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ── Analytics Page ─────────────────────────────────
+function renderAnalytics(el) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun'];
+  const values = [42000, 58000, 51000, 67000, 74000, 89000];
+  const maxVal = Math.max(...values);
+
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">Analytics</h2>
+      <p class="text-muted text-sm">Inventory movement, event revenue, and consumption trends</p>
+    </div>
+    <select class="form-control" style="width:auto">
+      <option>Last 6 Months</option><option>Last 30 Days</option><option>This Year</option>
+    </select>
+  </div>
+
+  <div class="grid-2 mb-6">
+    <div class="card">
+      <div class="card-header"><span>💰</span><div class="card-title">Monthly Revenue</div></div>
+      <div class="card-body">
+        <div style="display:flex;align-items:flex-end;gap:8px;height:120px;margin-bottom:8px">
+          ${months.map((m,i) => `
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+            <div style="flex:1;width:100%;display:flex;align-items:flex-end">
+              <div style="width:100%;height:${(values[i]/maxVal*100).toFixed(0)}%;background:linear-gradient(180deg,#3b82f6,#1d4ed8);border-radius:4px 4px 0 0;transition:height 0.6s ease;min-height:4px;cursor:pointer"
+                title="₱${values[i].toLocaleString()}" onmouseover="this.style.background='linear-gradient(180deg,#60a5fa,#3b82f6)'" onmouseout="this.style.background='linear-gradient(180deg,#3b82f6,#1d4ed8)'"></div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted)">${m}</div>
+          </div>`).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.72rem">
+          <span style="color:var(--text-muted)">YTD Total</span>
+          <span style="color:var(--accent-emerald);font-weight:600">₱${values.reduce((a,b)=>a+b,0).toLocaleString()}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span>🍖</span><div class="card-title">Top Consumed Items</div></div>
+      <div class="card-body">
+        ${[
+          { name:'Chicken Breast', val:85, unit:'kg/month', col:'blue' },
+          { name:'Jasmine Rice', val:72, unit:'bags/month', col:'emerald' },
+          { name:'Pork Belly', val:61, unit:'kg/month', col:'amber' },
+          { name:'Cooking Oil', val:48, unit:'bottles/month', col:'cyan' },
+          { name:'Shrimp', val:35, unit:'kg/month', col:'violet' },
+        ].map(i => `
+        <div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:0.83rem;font-weight:500">${i.name}</span>
+            <span style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted)">${i.val} ${i.unit}</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill ${i.col}" style="width:${i.val}%"></div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><span>📦</span><div class="card-title">Stock Turnover by Category</div></div>
+      <div class="card-body">
+        ${[
+          { cat:'Meat & Poultry', turn:'4.2x', trend:'up' },
+          { cat:'Vegetables', turn:'8.1x', trend:'up' },
+          { cat:'Dry Goods', turn:'2.3x', trend:'down' },
+          { cat:'Seafood', turn:'5.7x', trend:'up' },
+          { cat:'Beverages', turn:'3.1x', trend:'stable' },
+          { cat:'Condiments', turn:'1.8x', trend:'down' },
+        ].map(c => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:0.83rem">${c.cat}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-family:var(--font-mono);font-weight:600">${c.turn}</span>
+            <span style="font-size:0.75rem;color:${c.trend==='up'?'var(--accent-emerald)':c.trend==='down'?'var(--accent-rose)':'var(--text-muted)'}">${c.trend==='up'?'↑':c.trend==='down'?'↓':'→'}</span>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span>🗓</span><div class="card-title">Events Performance</div></div>
+      <div class="card-body">
+        <div style="text-align:center;padding:10px 0 16px">
+          <div style="font-family:var(--font-display);font-size:2.5rem;font-weight:800;color:var(--accent-emerald)">94%</div>
+          <div style="font-size:0.83rem;color:var(--text-muted)">Client Satisfaction Rate</div>
+        </div>
+        ${[
+          { label:'Events This Month', val:'5', col:'blue' },
+          { label:'Revenue This Month', val:'₱405,500', col:'emerald' },
+          { label:'Avg Event Value', val:'₱81,100', col:'cyan' },
+          { label:'Repeat Clients', val:'38%', col:'violet' },
+        ].map(m => `
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:0.83rem;color:var(--text-muted)">${m.label}</span>
+          <span style="font-family:var(--font-mono);font-weight:600;color:var(--accent-${m.col==='blue'?'primary':m.col==='emerald'?'emerald':m.col==='cyan'?'cyan':'violet'})">${m.val}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Procurement Page ───────────────────────────────
+function renderProcurement(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">Procurement</h2>
+      <p class="text-muted text-sm">Purchase requests, vendor orders, and receiving workflows</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" onclick="aiPurchaseRecs()">🤖 AI Suggestions</button>
+      <button class="btn btn-primary">+ New PO</button>
+    </div>
+  </div>
+
+  <!-- AI Recommendations Banner -->
+  <div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.25);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:20px">
+    <div style="display:flex;gap:12px;align-items:flex-start">
+      <span style="font-size:1.5rem">🤖</span>
+      <div>
+        <div style="font-weight:700;color:#a78bfa;margin-bottom:6px">AI Purchase Recommendations</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${[
+            'Reorder Jasmine Rice (15 bags) from Golden Rice Trading',
+            'Purchase Shrimp (20 kg) — event demand spike detected',
+            'Restock Tomatoes (25 kg) before Jun 5 event',
+          ].map(r => `<div style="background:rgba(139,92,246,0.12);padding:6px 12px;border-radius:7px;font-size:0.8rem;color:var(--text-secondary)">✓ ${r}</div>`).join('')}
+        </div>
+      </div>
+      <button class="btn btn-sm" style="margin-left:auto;background:rgba(139,92,246,0.2);border:1px solid rgba(139,92,246,0.3);color:#a78bfa" onclick="navigate('ai')">View Full Analysis →</button>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><span>📋</span><div class="card-title">Recent Purchase Orders</div></div>
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead><tr><th>PO #</th><th>VENDOR</th><th>ITEMS</th><th>VALUE</th><th>STATUS</th></tr></thead>
+          <tbody>
+            ${[
+              { po:'PO-2026-054', vendor:'Golden Rice Trading', items:3, val:6300, status:'delivered' },
+              { po:'PO-2026-053', vendor:'Metro Meat Center', items:5, val:18400, status:'transit' },
+              { po:'PO-2026-052', vendor:'Agri-Fresh Suppliers', items:8, val:4200, status:'pending' },
+              { po:'PO-2026-051', vendor:'City Beverage Corp', items:2, val:7500, status:'delivered' },
+            ].map(po => `
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:0.75rem">${po.po}</td>
+              <td style="font-size:0.83rem">${po.vendor}</td>
+              <td>${po.items} items</td>
+              <td style="font-family:var(--font-mono);color:var(--accent-cyan)">₱${po.val.toLocaleString()}</td>
+              <td><span class="badge ${po.status==='delivered'?'success':po.status==='transit'?'info':'warning'}">${po.status}</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span>⚠️</span><div class="card-title">Items Needing Reorder</div></div>
+      <div class="card-body">
+        ${STATE.inventory.filter(i => i.status === 'low' || i.qty <= i.reorder).map(item => `
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--bg-elevated);border-radius:8px;margin-bottom:8px">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:0.85rem">${item.name}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Current: ${item.qty} ${item.unit} | Min: ${item.reorder} ${item.unit}</div>
+          </div>
+          <button class="btn btn-primary btn-sm">Order</button>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Recipes Page ───────────────────────────────────
+function renderRecipes(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">Recipes & Food Costing</h2>
+      <p class="text-muted text-sm">Recipe builder with automatic inventory deduction and cost calculation</p>
+    </div>
+    <button class="btn btn-primary">+ New Recipe</button>
+  </div>
+
+  <div class="grid-auto">
+    ${[
+      { name:'Lechon Manok', serves:50, cost:125, time:'2 hrs', cat:'Main Course' },
+      { name:'Pancit Canton Guisado', serves:100, cost:45, time:'45 min', cat:'Noodle Dish' },
+      { name:'Beef Caldereta', serves:80, cost:185, time:'3 hrs', cat:'Main Course' },
+      { name:'Buko Salad', serves:100, cost:28, time:'30 min', cat:'Dessert' },
+      { name:'Pork Adobo', serves:60, cost:95, time:'1.5 hrs', cat:'Main Course' },
+      { name:'Macaroni Salad', serves:80, cost:32, time:'20 min', cat:'Side Dish' },
+    ].map(r => `
+    <div class="card" style="cursor:pointer" onclick="viewRecipe('${r.name}')">
+      <div class="card-body">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div style="font-size:1.5rem">🍽</div>
+          <span class="badge muted">${r.cat}</span>
+        </div>
+        <div style="font-weight:700;font-size:1rem;margin-bottom:4px">${r.name}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:12px">⏱ ${r.time} · 👥 Serves ${r.serves}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700;color:var(--accent-emerald)">₱${r.cost}</div>
+            <div style="font-size:0.68rem;color:var(--text-muted)">cost per serving</div>
+          </div>
+          <button class="btn btn-primary btn-sm">View Recipe</button>
+        </div>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ── Vendors Page ───────────────────────────────────
+function renderVendors(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">Vendor Management</h2>
+      <p class="text-muted text-sm">Supplier database, ratings, and order history</p>
+    </div>
+    <button class="btn btn-primary">+ Add Vendor</button>
+  </div>
+  <div class="card">
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th>VENDOR</th><th>CONTACT</th><th>CATEGORY</th><th>RATING</th><th>TOTAL ORDERS</th><th>ACTIONS</th></tr></thead>
+        <tbody>
+          ${MOCK.vendors.map(v => `
+          <tr>
+            <td><div style="font-weight:600;color:var(--text-primary)">${v.name}</div><div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted)">${v.id}</div></td>
+            <td style="font-family:var(--font-mono);font-size:0.78rem">${v.contact}</td>
+            <td><span class="badge info">${v.category}</span></td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="color:#f59e0b">★</span>
+                <span style="font-family:var(--font-mono);font-weight:600">${v.rating}</span>
+              </div>
+            </td>
+            <td style="font-family:var(--font-mono)">${v.orders} orders</td>
+            <td>
+              <div style="display:flex;gap:4px">
+                <button class="btn btn-primary btn-sm">New PO</button>
+                <button class="btn btn-secondary btn-sm">📋 History</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ── Transactions Page ──────────────────────────────
+function renderTransactions(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">Transaction History</h2>
+      <p class="text-muted text-sm">All inventory movements, adjustments, and transfers</p>
+    </div>
+    <button class="btn btn-secondary">📥 Export</button>
+  </div>
+  <div class="card">
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th>TIME</th><th>ITEM</th><th>ACTION</th><th>QTY</th><th>LOCATION</th><th>OPERATOR</th><th>REF</th></tr></thead>
+        <tbody>
+          ${[...MOCK.scanHistory, ...MOCK.scanHistory.map(s=>({...s,time:'Yesterday'}))].map((s,i) => `
+          <tr>
+            <td style="font-family:var(--font-mono);font-size:0.72rem">${s.time}</td>
+            <td style="font-weight:600">${s.name}</td>
+            <td><span class="badge ${s.action==='Stock In'?'success':s.action==='Stock Out'?'danger':'info'}">${s.action}</span></td>
+            <td style="font-family:var(--font-mono);font-weight:600;color:${s.qty.startsWith('+')?'var(--accent-emerald)':'var(--accent-rose)'}">${s.qty}</td>
+            <td style="font-size:0.78rem;color:var(--text-muted)">Main Warehouse</td>
+            <td style="font-size:0.78rem">${s.operator}</td>
+            <td style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted)">TXN-${String(1000+i).padStart(4,'0')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ── Notifications Page ─────────────────────────────
+function renderNotificationsPage(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">Notifications & Alerts</h2>
+      <p class="text-muted text-sm">Real-time alerts for inventory, events, and system events</p>
+    </div>
+    <button class="btn btn-secondary">Mark All Read</button>
+  </div>
+  <div class="card">
+    ${STATE.notifications.map(n => `
+    <div class="notif-item">
+      <div class="notif-dot ${n.type === 'danger' ? 'rose' : n.type === 'amber' ? 'amber' : 'cyan'}"></div>
+      <div style="font-size:1.2rem">${n.icon}</div>
+      <div class="notif-text">
+        <div class="notif-title">${n.title}</div>
+        <div class="notif-desc">${n.desc}</div>
+      </div>
+      <div class="notif-time">${n.time}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ── Settings Page ──────────────────────────────────
+function renderSettings(el) {
+  el.innerHTML = `
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="font-display" style="font-size:1.5rem;font-weight:800">System Settings</h2>
+    </div>
+    <button class="btn btn-primary" onclick="saveSettings()">💾 Save Changes</button>
+  </div>
+  <div class="grid-2">
+    <div class="card mb-4">
+      <div class="card-header"><span>🔗</span><div class="card-title">API Configuration</div></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Google Apps Script URL</label>
+          <input type="text" class="form-control" value="${CONFIG.GAS_URL}" placeholder="GAS deployment URL">
+        </div>
+        <div class="form-group">
+          <label class="form-label">WebSocket Server URL</label>
+          <input type="text" class="form-control" value="${CONFIG.WS_URL}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Branch Name</label>
+          <input type="text" class="form-control" value="${CONFIG.BRANCH}">
+        </div>
+      </div>
+    </div>
+    <div class="card mb-4">
+      <div class="card-header"><span>🔔</span><div class="card-title">Notifications</div></div>
+      <div class="card-body">
+        ${[
+          'Email alerts for low stock',
+          'Push notifications',
+          'WhatsApp alerts (RFID missing)',
+          'Daily inventory summary email',
+          'Event reminder (24hr before)',
+        ].map(s => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:0.85rem">${s}</span>
+          <div style="width:40px;height:22px;background:var(--accent-emerald);border-radius:11px;cursor:pointer;position:relative;transition:background var(--transition)" onclick="this.style.background=this.style.background===''||this.style.background==='rgb(16, 185, 129)'?'var(--bg-elevated)':'var(--accent-emerald)'">
+            <div style="position:absolute;right:2px;top:2px;width:18px;height:18px;border-radius:50%;background:white;transition:right var(--transition)"></div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span>👤</span><div class="card-title">Account</div></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Display Name</label>
+          <input type="text" class="form-control" value="Cyril Sitchon">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-control" value="resitch@gmail.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <select class="form-control"><option>Administrator</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span>📱</span><div class="card-title">PWA & Offline</div></div>
+      <div class="card-body">
+        <div class="alert info mb-3">
+          <span>ℹ️</span>
+          <div>Install this app on your device for offline access to inventory scanning and data.</div>
+        </div>
+        <button class="btn btn-primary w-full mb-3" id="installBtn" onclick="installPWA()">📱 Install App</button>
+        <button class="btn btn-secondary w-full" onclick="syncOfflineQueue()">🔄 Sync Offline Queue (<span id="queueCount">0</span>)</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Interactive Functions ──────────────────────────
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('mainContent');
+  const overlay = document.getElementById('mobileOverlay');
+
+  if (window.innerWidth <= 768) {
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('show');
+  } else {
+    sidebar.classList.toggle('collapsed');
+    main.classList.toggle('expanded');
+  }
+}
+
+function toggleNotifPanel() {
+  const panel = document.getElementById('notifPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function openModal(id) {
+  document.getElementById(id).style.display = 'flex';
+}
+
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+function renderNotifications() {
+  const list = document.getElementById('notifList');
+  if (!list) return;
+  list.innerHTML = STATE.notifications.map(n => `
+  <div class="notif-item">
+    <div class="notif-dot ${n.type === 'danger' ? 'rose' : n.type === 'amber' ? 'amber' : 'cyan'}"></div>
+    <div class="notif-text">
+      <div class="notif-title">${n.title}</div>
+      <div class="notif-desc">${n.desc}</div>
+    </div>
+    <div class="notif-time">${n.time}</div>
+  </div>`).join('');
+}
+
+// ── AI Integration ─────────────────────────────────
+async function sendAIMessage() {
+  const input = document.getElementById('aiInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  appendAIMessage(msg, 'user');
+  input.value = '';
+
+  const loading = appendAIMessage('', 'assistant', true);
+
+  try {
+    const inventorySummary = STATE.inventory.map(i =>
+      `${i.name}: ${i.qty} ${i.unit} (status: ${i.status}, cost: ₱${i.cost}/${i.unit})`
+    ).join(', ');
+
+    const eventsSummary = STATE.events.map(e =>
+      `${e.name} on ${e.date} (${e.guests} guests, status: ${e.status})`
+    ).join(', ');
+
+    const systemPrompt = `You are the AI assistant for Appetina Catering & Food Services, a catering company in Iligan City, Philippines.
+Current inventory: ${inventorySummary}
+Upcoming events: ${eventsSummary}
+Provide concise, actionable insights. Use ₱ for Philippine Peso. Be specific with numbers and recommendations.`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [
+          ...STATE.aiMessages.slice(-6),
+          { role: 'user', content: msg }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    loading.remove();
+
+    if (data.content && data.content[0]) {
+      const reply = data.content[0].text;
+      appendAIMessage(reply, 'assistant');
+      STATE.aiMessages.push({ role: 'user', content: msg });
+      STATE.aiMessages.push({ role: 'assistant', content: reply });
+    } else {
+      appendAIMessage('Sorry, I encountered an error. Please check your API configuration.', 'assistant');
+    }
+  } catch (err) {
+    loading.remove();
+    // Demo mode fallback
+    const demoReplies = {
+      'low stock': `📦 **Low Stock Items:**\n\n1. **Jasmine Rice** — 8 bags (min: 10 bags) ⚠️\n2. **Shrimp** — 5 kg (min: 8 kg) ⚠️\n\n**Recommendation:** Order 15 bags of Jasmine Rice from Golden Rice Trading (₱2,100/bag = ₱31,500 total) and 20 kg shrimp before the June 15 wedding event.`,
+      'forecast': `🔮 **Weekly Inventory Forecast:**\n\nBased on upcoming events (Dela Cruz Wedding 300 guests, LDCU Dinner 150 guests):\n\n• Chicken Breast: Need ~45 kg more (current 45 kg, need 90 kg)\n• Rice: Critical — order immediately\n• Pork Belly: Sufficient for current events\n• Shrimp: Order 15 kg for seafood menu\n\nEstimated procurement cost: ₱45,200`,
+    };
+    const lower = msg.toLowerCase();
+    const reply = lower.includes('low') ? demoReplies['low stock'] :
+                  lower.includes('forecast') || lower.includes('next week') ? demoReplies['forecast'] :
+                  `Based on your current inventory of ${STATE.inventory.length} items and ${STATE.events.length} upcoming events, I can provide detailed analysis. Please ensure your API key is configured in Settings for full AI functionality.`;
+    appendAIMessage(reply, 'assistant');
+  }
+}
+
+function appendAIMessage(text, role, loading = false) {
+  const messages = document.getElementById('aiMessages');
+  const div = document.createElement('div');
+  div.className = `ai-msg ${role} ${loading ? 'loading' : ''}`;
+
+  if (loading) {
+    div.innerHTML = '<div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div>';
+  } else {
+    div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+  }
+
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  return div;
+}
+
+function sendQuickCommand(cmd) {
+  const input = document.getElementById('aiInput');
+  if (input) {
+    input.value = cmd;
+    sendAIMessage();
+  } else {
+    navigate('ai');
+    setTimeout(() => {
+      const inp = document.getElementById('aiInput');
+      if (inp) { inp.value = cmd; sendAIMessage(); }
+    }, 100);
+  }
+}
+
+async function quickAIQuery(query) {
+  const result = document.getElementById('quickAIResult');
+  result.style.display = 'block';
+  result.innerHTML = '<div style="display:flex;gap:6px;align-items:center"><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div></div>';
+
+  await new Promise(r => setTimeout(r, 1200));
+
+  const responses = {
+    '📊 Show low stock items': '⚠️ <strong>2 items below reorder level:</strong><br>• Jasmine Rice: 8 bags (min: 10)<br>• Shrimp: 5 kg (min: 8 kg)',
+    '🔮 Forecast next week': '📈 <strong>Next week forecast:</strong><br>June 15 Wedding (300 pax) + June 20 Dinner (150 pax)<br>Estimated inventory need: ~₱45,200 additional stock required',
+    '🛒 Purchase recommendations': '🛒 <strong>Recommended orders:</strong><br>• Jasmine Rice: 15 bags from Golden Rice Trading (₱31,500)<br>• Shrimp: 20 kg from Iligan Seafood (₱11,200)',
+    '⏰ Expiring items report': '⏰ <strong>Expiring within 7 days:</strong><br>• Fresh Tomatoes: 12 kg (Jun 2)<br>• Pork Belly: 28 kg (Jun 4) — use in events!',
+  };
+
+  result.innerHTML = responses[query] || 'Analysis complete. View the AI Assistant for the full report.';
+}
+
+function clearAIChat() {
+  STATE.aiMessages = [];
+  const el = document.getElementById('aiMessages');
+  if (el) el.innerHTML = '<div class="ai-msg assistant">Chat cleared. How can I help you?</div>';
+}
+
+// ── Scanner Functions ──────────────────────────────
+let cameraActive = false;
+
+function toggleCamera() {
+  const btn = document.getElementById('scanToggle');
+  const box = document.getElementById('scannerBox');
+  if (!box) return;
+
+  cameraActive = !cameraActive;
+  if (cameraActive) {
+    btn.textContent = '⏹ Stop Camera';
+    box.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;height:280px;background:var(--bg-deep);flex-direction:column;gap:16px">
+        <div style="font-size:3rem;animation:rfidPulse 1.5s infinite">📷</div>
+        <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--accent-cyan)">CAMERA ACTIVE — SCANNING...</div>
+        <div class="scanner-frame" style="position:relative;width:200px;height:120px;border:2px solid var(--accent-cyan);border-radius:8px;overflow:hidden">
+          <div class="scanner-line" style="position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent-cyan),transparent);animation:scan 2s linear infinite"></div>
+        </div>
+        <div style="font-size:0.78rem;color:var(--text-muted)">Point camera at barcode</div>
+      </div>`;
+
+    // Simulate a scan after 3 seconds
+    setTimeout(() => {
+      if (cameraActive) simulateScan('CHKN-BR-001');
+    }, 3000);
+  } else {
+    btn.textContent = '📷 Start Camera';
+    box.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;height:280px;background:var(--bg-surface);color:var(--text-muted);flex-direction:column;gap:12px;padding:40px">
+        <span style="font-size:3rem">📷</span>
+        <div style="font-size:0.88rem;text-align:center">Camera stopped</div>
+      </div>`;
+  }
+}
+
+function setScanMode(mode, btn) {
+  document.querySelectorAll('.tab-list .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('scanMode').textContent = mode.toUpperCase();
+}
+
+function processBarcode(code) {
+  if (!code.trim()) return;
+  simulateScan(code.trim());
+  document.getElementById('manualBarcode').value = '';
+}
+
+function simulateScan(barcode) {
+  const item = STATE.inventory.find(i => i.sku === barcode || i.id === barcode || i.rfid === barcode);
+  const result = document.getElementById('scanResult');
+  if (!result) return;
+
+  result.style.display = 'block';
+  if (item) {
+    result.innerHTML = `
+      <div style="display:flex;gap:12px;align-items:center">
+        <span style="font-size:2rem">✅</span>
+        <div>
+          <div style="font-weight:700;font-size:1rem;color:var(--accent-emerald)">${item.name}</div>
+          <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted)">${item.sku} · ${item.cat}</div>
+          <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+            <span class="badge ${item.status==='good'?'success':item.status==='low'?'warning':'danger'}">${item.status}</span>
+            <span class="badge info">Qty: ${item.qty} ${item.unit}</span>
+            <span class="badge muted">₱${item.cost}/${item.unit}</span>
+            <span class="badge cyan">${item.location}</span>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    result.innerHTML = `
+      <div style="display:flex;gap:12px;align-items:center">
+        <span style="font-size:2rem">❓</span>
+        <div>
+          <div style="font-weight:700;color:var(--accent-amber)">Item Not Found</div>
+          <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted)">Barcode: ${barcode}</div>
+          <div style="margin-top:8px">
+            <button class="btn btn-primary btn-sm" onclick="openModal('inventoryModal')">+ Add New Item</button>
+          </div>
+        </div>
+      </div>`;
+  }
+}
+
+function stockAdjust(id) {
+  const item = STATE.inventory.find(i => i.id === id);
+  if (!item) return;
+  const qty = parseInt(prompt(`Adjust quantity for "${item.name}" (current: ${item.qty} ${item.unit}).\nEnter adjustment (e.g. +10 or -5):`));
+  if (isNaN(qty)) return;
+  item.qty = Math.max(0, item.qty + qty);
+  item.status = item.qty <= item.reorder ? 'low' : item.status;
+  navigate('inventory');
+  showToast(`Updated ${item.name}: ${item.qty} ${item.unit}`);
+}
+
+function editItem(id) {
+  openModal('inventoryModal');
+  const item = STATE.inventory.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById('inventoryModalTitle').textContent = 'Edit Item';
+  document.getElementById('itemName').value = item.name;
+  document.getElementById('itemSKU').value = item.sku;
+  document.getElementById('itemQty').value = item.qty;
+  document.getElementById('itemCost').value = item.cost;
+  document.getElementById('itemRFID').value = item.rfid || '';
+}
+
+function saveInventoryItem() {
+  const name = document.getElementById('itemName').value;
+  if (!name) { alert('Item name is required'); return; }
+
+  const newItem = {
+    id: 'INV' + String(STATE.inventory.length + 1).padStart(3, '0'),
+    name,
+    sku: document.getElementById('itemSKU').value || 'SKU-' + Date.now(),
+    cat: document.getElementById('itemCategory').value || 'Uncategorized',
+    qty: parseInt(document.getElementById('itemQty').value) || 0,
+    unit: document.getElementById('itemUnit').value,
+    cost: parseFloat(document.getElementById('itemCost').value) || 0,
+    reorder: parseInt(document.getElementById('itemReorder').value) || 5,
+    location: document.getElementById('itemLocation').value,
+    expiry: document.getElementById('itemExpiry').value || null,
+    rfid: document.getElementById('itemRFID').value || null,
+    status: 'good',
+  };
+
+  STATE.inventory.push(newItem);
+  closeModal('inventoryModal');
+  showToast(`✅ "${name}" added to inventory`);
+  if (STATE.currentPage === 'inventory') navigate('inventory');
+}
+
+function startNFCScan() {
+  if ('NDEFReader' in window) {
+    showToast('📡 NFC scanning started — tap a tag');
+  } else {
+    showToast('⚠️ Web NFC requires Android Chrome');
+  }
+}
+
+function viewRFIDTag(id) {
+  const tag = STATE.rfidTags.find(t => t.id === id);
+  if (tag) showToast(`📡 ${tag.name} — ${tag.status.toUpperCase()} @ ${tag.location}`);
+}
+
+function viewEventDetails(id) {
+  const ev = STATE.events.find(e => e.id === id);
+  if (ev) showToast(`📅 ${ev.name} — ${ev.guests} guests, ${ev.venue}`);
+}
+
+function viewRecipe(name) {
+  showToast(`📋 Opening recipe: ${name}`);
+}
+
+function filterInventory(q) {
+  const tbody = document.getElementById('inventoryTableBody');
+  if (!tbody) return;
+  const filtered = STATE.inventory.filter(i =>
+    i.name.toLowerCase().includes(q.toLowerCase()) ||
+    i.sku.toLowerCase().includes(q.toLowerCase()) ||
+    i.cat.toLowerCase().includes(q.toLowerCase())
+  );
+  tbody.innerHTML = renderInventoryRows(filtered);
+}
+
+function filterByCategory(cat) {
+  const tbody = document.getElementById('inventoryTableBody');
+  if (!tbody) return;
+  const filtered = cat ? STATE.inventory.filter(i => i.cat === cat) : STATE.inventory;
+  tbody.innerHTML = renderInventoryRows(filtered);
+}
+
+function filterByStatus(status) {
+  const tbody = document.getElementById('inventoryTableBody');
+  if (!tbody) return;
+  const filtered = status ? STATE.inventory.filter(i => i.status === status) : STATE.inventory;
+  tbody.innerHTML = renderInventoryRows(filtered);
+}
+
+function handleSearch(q) {
+  if (!q) return;
+  // Highlight relevant nav
+}
+
+function generateReport(name, format) {
+  showToast(`📄 Generating ${name} as ${format}...`);
+  setTimeout(() => showToast(`✅ ${name} (${format}) ready to download`), 1500);
+}
+
+function exportInventory() {
+  const csv = ['Item,SKU,Category,Qty,Unit,Cost,Location,Status',
+    ...STATE.inventory.map(i => `${i.name},${i.sku},${i.cat},${i.qty},${i.unit},${i.cost},${i.location},${i.status}`)
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `appetina-inventory-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  showToast('✅ Inventory exported as CSV');
+}
+
+function importInventory() {
+  showToast('📤 Import: Drag & drop a CSV file or click to browse');
+}
+
+function aiPurchaseRecs() {
+  navigate('ai');
+  setTimeout(() => sendQuickCommand('Generate purchase recommendations based on upcoming events'), 100);
+}
+
+function saveSettings() { showToast('✅ Settings saved'); }
+
+function installPWA() {
+  if (window.deferredPrompt) {
+    window.deferredPrompt.prompt();
+  } else {
+    showToast('ℹ️ To install: use browser menu → "Add to Home Screen"');
+  }
+}
+
+function syncOfflineQueue() {
+  showToast(`🔄 Syncing ${STATE.offlineQueue.length} queued transactions...`);
+}
+
+function clearScanHistory() { showToast('🗑 Scan history cleared'); }
+
+function addRFIDTag() { showToast('📡 Tap RFID tag to register it'); }
+
+// ── Real-time Simulation ───────────────────────────
+function simulateRealtime() {
+  // Simulate incoming WebSocket events
+  const events = [
+    () => addLiveFeedItem('#10b981', '<strong>System</strong> Inventory sync completed — all data up to date'),
+    () => addLiveFeedItem('#3b82f6', '<strong>RFID-A1B2</strong> Chafing Dish Set A — location confirmed: Warehouse'),
+    () => addLiveFeedItem('#f59e0b', '<strong>Alert</strong> Pork Belly expiring in 6 days'),
+    () => addLiveFeedItem('#8b5cf6', '<strong>AI</strong> New insight: Consider tomato order reduction by 20%'),
+    () => addLiveFeedItem('#06b6d4', '<strong>Staff C</strong> checked stock for San Miguel Beer — 24 cases OK'),
+  ];
+
+  let i = 0;
+  setInterval(() => {
+    if (STATE.currentPage === 'dashboard') {
+      if (i < events.length) { events[i](); i++; }
+      else { i = 0; }
+    }
+  }, 8000);
+}
+
+function addLiveFeedItem(color, text) {
+  const feed = document.getElementById('liveFeed');
+  if (!feed) return;
+  const item = document.createElement('div');
+  item.className = 'feed-item';
+  item.style.animation = 'fadeIn 0.3s ease';
+  item.innerHTML = `
+    <div class="feed-dot" style="background:${color}"></div>
+    <div class="feed-text">${text}</div>
+    <div class="feed-time">just now</div>`;
+  feed.insertBefore(item, feed.firstChild);
+  if (feed.children.length > 10) feed.removeChild(feed.lastChild);
+}
+
+// ── Toast Notifications ────────────────────────────
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed; bottom:24px; right:24px; z-index:9999;
+    background:var(--bg-elevated); border:1px solid var(--border-bright);
+    padding:12px 18px; border-radius:10px; font-size:0.85rem;
+    color:var(--text-primary); box-shadow:0 8px 30px rgba(0,0,0,0.4);
+    animation:slideDown 0.3s ease; max-width:320px; line-height:1.4;
+  `;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ── Utility Functions ──────────────────────────────
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ── PWA Support ────────────────────────────────────
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  window.deferredPrompt = e;
+});
+
+// ── USB HID Barcode Scanner Support ───────────────
+let hidscanBuffer = '';
+let hidscanTimer = null;
+
+document.addEventListener('keypress', e => {
+  // USB HID scanners typically send characters rapidly followed by Enter
+  if (e.key === 'Enter' && hidscanBuffer.length > 3) {
+    const barcode = hidscanBuffer.trim();
+    hidscanBuffer = '';
+    if (STATE.currentPage === 'scanner') {
+      const input = document.getElementById('manualBarcode');
+      if (input) { input.value = barcode; processBarcode(barcode); }
+    }
+  } else if (e.key !== 'Enter') {
+    hidscanBuffer += e.key;
+    clearTimeout(hidscanTimer);
+    hidscanTimer = setTimeout(() => { hidscanBuffer = ''; }, 100);
+  }
+});
+
+// ── Keyboard Shortcuts ─────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    document.getElementById('globalSearch')?.focus();
+  }
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none');
+    document.getElementById('notifPanel').style.display = 'none';
+  }
+});
+
+// Close notif panel when clicking outside
+document.addEventListener('click', e => {
+  const panel = document.getElementById('notifPanel');
+  if (panel && !panel.contains(e.target) && !e.target.closest('.icon-btn')) {
+    panel.style.display = 'none';
+  }
+});
+
+console.log(`
+█████╗ ██████╗ ██████╗ ███████╗████████╗██╗███╗   ██╗ █████╗
+██╔══██╗██╔══██╗██╔══██╗██╔════╝╚══██╔══╝██║████╗  ██║██╔══██╗
+███████║██████╔╝██████╔╝█████╗     ██║   ██║██╔██╗ ██║███████║
+██╔══██║██╔═══╝ ██╔═══╝ ██╔══╝     ██║   ██║██║╚██╗██║██╔══██║
+██║  ██║██║     ██║     ███████╗   ██║   ██║██║ ╚████║██║  ██║
+╚═╝  ╚═╝╚═╝     ╚═╝     ╚══════╝   ╚═╝   ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝
+IMS v2.0.0 — Enterprise Catering Inventory Intelligence
+Iligan City, Philippines
+`);
+</script>
+</body>
+</html>
