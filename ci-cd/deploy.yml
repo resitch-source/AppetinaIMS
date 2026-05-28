@@ -1,0 +1,188 @@
+name: Deploy Appetina IMS to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages:    write
+  id-token: write
+
+concurrency:
+  group:              ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── Quality Gate ────────────────────────────────────────────
+  validate:
+    name: Validate & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate HTML
+        run: |
+          npx --yes html-validate index.html --config .htmlvalidate.json || true
+
+      - name: Check for secrets in code
+        run: |
+          # Ensure no hardcoded secrets
+          if grep -rn "AKfycb\|sk-\|api_key.*=" --include="*.js" --include="*.html" .; then
+            echo "⚠️  Potential hardcoded secrets found — review before merge"
+          fi
+
+      - name: Validate manifest.json
+        run: |
+          cat manifest.json | python3 -m json.tool > /dev/null && echo "✅ manifest.json is valid JSON"
+
+  # ── Build & Deploy ───────────────────────────────────────────
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+        continue-on-error: true
+
+      # Inject runtime environment variables (non-secret config)
+      - name: Inject config
+        env:
+          GAS_URL:    ${{ secrets.GAS_DEPLOYMENT_URL }}
+          WS_URL:     ${{ secrets.WS_SERVER_URL }}
+          APP_BRANCH: ${{ vars.APP_BRANCH || 'Iligan City Main' }}
+        run: |
+          # Replace placeholders in index.html
+          if [ -n "$GAS_URL" ]; then
+            sed -i "s|YOUR_GAS_DEPLOYMENT_URL/exec|${GAS_URL}|g" index.html
+            echo "✅ GAS URL injected"
+          fi
+          if [ -n "$WS_URL" ]; then
+            sed -i "s|wss://your-realtime-server.railway.app|${WS_URL}|g" index.html
+            echo "✅ WebSocket URL injected"
+          fi
+          sed -i "s|'Iligan City Main'|'${APP_BRANCH}'|g" index.html
+
+      # Copy PWA files to root if in subdirectory
+      - name: Prepare PWA assets
+        run: |
+          cp pwa/manifest.json manifest.json 2>/dev/null || true
+          cp pwa/sw.js sw.js 2>/dev/null || true
+          echo "✅ PWA files ready"
+
+      # Generate cache-busting sw version
+      - name: Update SW version
+        run: |
+          COMMIT_HASH="${{ github.sha }}"
+          SHORT_HASH="${COMMIT_HASH:0:8}"
+          sed -i "s|appetina-v2.0.0|appetina-v2.0.0-${SHORT_HASH}|g" sw.js
+          echo "✅ SW version: appetina-v2.0.0-${SHORT_HASH}"
+
+      # Create 404.html for SPA routing
+      - name: Create 404 redirect
+        run: |
+          cat > 404.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Appetina IMS</title>
+            <script>
+              // GitHub Pages SPA redirect
+              const path = window.location.pathname.replace('/Appetina.MobileApps', '');
+              sessionStorage.setItem('spa_redirect', path);
+              window.location.replace('/Appetina.MobileApps/');
+            </script>
+          </head>
+          <body>Redirecting...</body>
+          </html>
+          EOF
+          echo "✅ 404 redirect created"
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir:  ./
+          exclude_assets: |
+            .github/**
+            gas-backend/**
+            realtime-server/**
+            docs/**
+            ci-cd/**
+            *.md
+            .gitignore
+            node_modules/**
+          commit_message: |
+            🚀 Deploy Appetina IMS v2.0.0
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref_name }}
+
+      - name: Deployment Summary
+        run: |
+          echo "## ✅ Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://resitch-source.github.io/Appetina.MobileApps/" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u +"%Y-%m-%d %H:%M UTC")" >> $GITHUB_STEP_SUMMARY
+
+  # ── Deploy Realtime Server ───────────────────────────────────
+  deploy-realtime:
+    name: Deploy WebSocket Server to Railway
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_REALTIME == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          cd realtime-server
+          railway up --service appetina-realtime
+          echo "✅ Realtime server deployed"
+        continue-on-error: true
+
+  # ── Notify on Deploy ─────────────────────────────────────────
+  notify:
+    name: Notify Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always() && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Send deployment notification
+        env:
+          DEPLOY_HOOK: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -n "$DEPLOY_HOOK" ]; then
+            STATUS="${{ needs.deploy.result }}"
+            EMOJI="✅"
+            [ "$STATUS" != "success" ] && EMOJI="❌"
+            curl -s -X POST "$DEPLOY_HOOK" \
+              -H "Content-Type: application/json" \
+              -d "{\"text\":\"${EMOJI} Appetina IMS deployment ${STATUS}\\nCommit: ${{ github.sha }}\\nBy: ${{ github.actor }}\"}" || true
+          fi
